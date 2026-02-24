@@ -69,6 +69,12 @@ impl From<CollectionError> for PersistenceError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PersistOutcome {
+    Checkpointed,
+    WalOnly { reason: String },
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct SnapshotDocument {
     version: u32,
@@ -103,11 +109,15 @@ pub fn persist_change(
     wal_path: &Path,
     collections: &BTreeMap<String, Collection>,
     record: &WalRecord,
-) -> Result<(), PersistenceError> {
+) -> Result<PersistOutcome, PersistenceError> {
     append_wal(wal_path, record)?;
-    write_snapshot(snapshot_path, collections)?;
-    truncate_wal(wal_path)?;
-    Ok(())
+
+    match write_snapshot(snapshot_path, collections).and_then(|_| truncate_wal(wal_path)) {
+        Ok(()) => Ok(PersistOutcome::Checkpointed),
+        Err(error) => Ok(PersistOutcome::WalOnly {
+            reason: error.to_string(),
+        }),
+    }
 }
 
 pub fn apply_wal_record(
@@ -120,9 +130,13 @@ pub fn apply_wal_record(
             dimension,
             strict_finite,
         } => {
-            if collections.contains_key(name) {
+            if let Some(existing) = collections.get(name) {
+                if existing.dimension() == *dimension && existing.strict_finite() == *strict_finite
+                {
+                    return Ok(());
+                }
                 return Err(PersistenceError::InvalidData(format!(
-                    "collection '{name}' already exists"
+                    "collection '{name}' already exists with different config"
                 )));
             }
 
@@ -146,11 +160,7 @@ pub fn apply_wal_record(
             let target = collections.get_mut(collection).ok_or_else(|| {
                 PersistenceError::InvalidData(format!("collection '{collection}' does not exist"))
             })?;
-            target.remove_point(*id).ok_or_else(|| {
-                PersistenceError::InvalidData(format!(
-                    "point '{id}' does not exist in collection '{collection}'"
-                ))
-            })?;
+            let _ = target.remove_point(*id);
             Ok(())
         }
     }

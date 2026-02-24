@@ -117,3 +117,25 @@ fn load_collections_replays_wal_when_snapshot_missing() {
 
     cleanup(&root);
 }
+
+#[test]
+fn load_collections_tolerates_replayed_create_after_snapshot() {
+    let (root, snapshot_path, wal_path) = test_paths("idempotent_create");
+
+    fs::create_dir_all(root.join("data")).expect("data directory should be creatable");
+    fs::write(
+        &snapshot_path,
+        r#"{"version":1,"collections":[{"name":"demo","dimension":2,"strict_finite":true,"points":[]}]} "#,
+    )
+    .expect("snapshot should be writable");
+    fs::write(
+        &wal_path,
+        r#"{"type":"create_collection","name":"demo","dimension":2,"strict_finite":true}"#,
+    )
+    .expect("wal should be writable");
+
+    let collections = load_collections(&snapshot_path, &wal_path).expect("load should succeed");
+    assert!(collections.contains_key("demo"));
+
+    cleanup(&root);
+}
