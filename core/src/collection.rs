@@ -121,6 +121,12 @@ impl Collection {
             .collect()
     }
 
+    pub fn iter_points(&self) -> impl Iterator<Item = (PointId, &[f32])> + '_ {
+        self.points
+            .iter()
+            .map(|(id, values)| (*id, values.as_slice()))
+    }
+
     fn validate_vector(&self, values: &[f32]) -> Result<(), CollectionError> {
         if values.len() != self.config.dimension {
             return Err(CollectionError::InvalidDimension {
@@ -260,5 +266,25 @@ mod tests {
         assert_eq!(collection.point_ids_page(3, 10), vec![70]);
         assert!(collection.point_ids_page(10, 2).is_empty());
         assert!(collection.point_ids_page(0, 0).is_empty());
+    }
+
+    #[test]
+    fn iter_points_is_sorted_and_contains_payloads() {
+        let mut collection = new_collection(true);
+        collection
+            .upsert_point(50, vec![5.0, 6.0, 7.0])
+            .expect("must succeed");
+        collection
+            .upsert_point(10, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+
+        let points: Vec<(PointId, Vec<f32>)> = collection
+            .iter_points()
+            .map(|(id, values)| (id, values.to_vec()))
+            .collect();
+        assert_eq!(
+            points,
+            vec![(10, vec![1.0, 2.0, 3.0]), (50, vec![5.0, 6.0, 7.0])]
+        );
     }
 }

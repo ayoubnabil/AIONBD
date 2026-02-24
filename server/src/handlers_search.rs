@@ -5,6 +5,8 @@ use aionbd_core::{
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::Json;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use crate::errors::{map_json_rejection, map_vector_error, ApiError};
 use crate::handler_utils::canonical_collection_name;
@@ -30,8 +32,7 @@ pub(crate) async fn search_collection(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let scored = score_collection(collection, &payload.query, payload.metric)?;
-    let best = select_top_k(scored, payload.metric, 1)
+    let best = select_top_k(collection, &payload.query, payload.metric, 1)?
         .into_iter()
         .next()
         .ok_or_else(|| ApiError::invalid_argument("collection contains no points"))?;
@@ -64,8 +65,7 @@ pub(crate) async fn search_collection_top_k(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let scored = score_collection(collection, &payload.query, payload.metric)?;
-    let hits = select_top_k(scored, payload.metric, payload.limit);
+    let hits = select_top_k(collection, &payload.query, payload.metric, payload.limit)?;
 
     Ok(Json(SearchTopKResponse {
         metric: payload.metric,
@@ -73,11 +73,12 @@ pub(crate) async fn search_collection_top_k(
     }))
 }
 
-fn score_collection(
+fn select_top_k(
     collection: &Collection,
     query: &[f32],
     metric: Metric,
-) -> Result<Vec<(u64, f32)>, ApiError> {
+    limit: usize,
+) -> Result<Vec<SearchHit>, ApiError> {
     if collection.is_empty() {
         return Err(ApiError::invalid_argument("collection contains no points"));
     }
@@ -88,29 +89,65 @@ fn score_collection(
             collection.dimension()
         )));
     }
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
 
     let options = VectorValidationOptions {
         strict_finite: collection.strict_finite(),
         zero_norm_epsilon: f32::EPSILON,
     };
 
-    let mut scored = Vec::with_capacity(collection.len());
-    for id in collection.point_ids() {
-        let values = collection
-            .get_point(id)
-            .ok_or_else(|| ApiError::internal("point id index is inconsistent"))?;
+    let keep = limit.min(collection.len());
+    let mut heap = BinaryHeap::with_capacity(keep);
 
-        let value = match metric {
-            Metric::Dot => dot_product_with_options(query, values, options),
-            Metric::L2 => l2_distance_with_options(query, values, options),
-            Metric::Cosine => cosine_similarity_with_options(query, values, options),
+    for (id, values) in collection.iter_points() {
+        let value = score_point(metric, query, values, options)?;
+        let candidate = HeapCandidate { id, value, metric };
+
+        if heap.len() < keep {
+            heap.push(candidate);
+            continue;
         }
-        .map_err(map_vector_error)?;
 
-        scored.push((id, value));
+        let should_replace = heap.peek().is_some_and(|worst| {
+            compare_scores(
+                &(candidate.id, candidate.value),
+                &(worst.id, worst.value),
+                metric,
+            )
+            .is_lt()
+        });
+        if should_replace {
+            let _ = heap.pop();
+            heap.push(candidate);
+        }
     }
 
-    Ok(scored)
+    let mut scored: Vec<(u64, f32)> = heap
+        .into_iter()
+        .map(|candidate| (candidate.id, candidate.value))
+        .collect();
+    sort_scores(&mut scored, metric);
+
+    Ok(scored
+        .into_iter()
+        .map(|(id, value)| SearchHit { id, value })
+        .collect())
+}
+
+fn score_point(
+    metric: Metric,
+    query: &[f32],
+    values: &[f32],
+    options: VectorValidationOptions,
+) -> Result<f32, ApiError> {
+    match metric {
+        Metric::Dot => dot_product_with_options(query, values, options),
+        Metric::L2 => l2_distance_with_options(query, values, options),
+        Metric::Cosine => cosine_similarity_with_options(query, values, options),
+    }
+    .map_err(map_vector_error)
 }
 
 fn sort_scores(scored: &mut [(u64, f32)], metric: Metric) {
@@ -126,23 +163,35 @@ fn sort_scores(scored: &mut [(u64, f32)], metric: Metric) {
     });
 }
 
-fn select_top_k(mut scored: Vec<(u64, f32)>, metric: Metric, limit: usize) -> Vec<SearchHit> {
-    if scored.is_empty() || limit == 0 {
-        return Vec::new();
-    }
+#[derive(Debug, Clone, Copy)]
+struct HeapCandidate {
+    id: u64,
+    value: f32,
+    metric: Metric,
+}
 
-    let keep = limit.min(scored.len());
-    if scored.len() > keep {
-        let nth = keep - 1;
-        scored.select_nth_unstable_by(nth, |left, right| compare_scores(left, right, metric));
-        scored.truncate(keep);
+impl PartialEq for HeapCandidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.value.to_bits() == other.value.to_bits()
     }
+}
 
-    sort_scores(&mut scored, metric);
-    scored
-        .into_iter()
-        .map(|(id, value)| SearchHit { id, value })
-        .collect()
+impl Eq for HeapCandidate {}
+
+impl PartialOrd for HeapCandidate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for HeapCandidate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        compare_scores(
+            &(self.id, self.value),
+            &(other.id, other.value),
+            self.metric,
+        )
+    }
 }
 
 fn compare_scores(left: &(u64, f32), right: &(u64, f32), metric: Metric) -> std::cmp::Ordering {
