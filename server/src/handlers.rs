@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 
 use aionbd_core::{
@@ -101,20 +100,21 @@ pub(crate) async fn create_collection(
         )));
     }
 
-    let previous_state = collections.clone();
     let response = build_collection_response(&collection);
     collections.insert(name.clone(), collection);
 
-    persist_with_rollback(
+    if let Err(error) = persist_change_if_enabled(
         &state,
-        &mut collections,
-        previous_state,
-        WalRecord::CreateCollection {
+        &collections,
+        &WalRecord::CreateCollection {
             name,
             dimension: payload.dimension,
             strict_finite: payload.strict_finite,
         },
-    )?;
+    ) {
+        let _ = collections.remove(&response.name);
+        return Err(error);
+    }
 
     Ok(Json(response))
 }
@@ -163,19 +163,18 @@ pub(crate) async fn delete_collection(
         .write()
         .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
 
-    let previous_state = collections.clone();
-    if collections.remove(&name).is_none() {
-        return Err(ApiError::not_found(format!(
-            "collection '{name}' not found"
-        )));
-    }
+    let removed_collection = collections
+        .remove(&name)
+        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    persist_with_rollback(
+    if let Err(error) = persist_change_if_enabled(
         &state,
-        &mut collections,
-        previous_state,
-        WalRecord::DeleteCollection { name: name.clone() },
-    )?;
+        &collections,
+        &WalRecord::DeleteCollection { name: name.clone() },
+    ) {
+        collections.insert(name.clone(), removed_collection);
+        return Err(error);
+    }
 
     Ok(Json(DeleteCollectionResponse {
         name,
@@ -196,27 +195,40 @@ pub(crate) async fn upsert_point(
         .write()
         .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
 
-    let previous_state = collections.clone();
     let values = payload.values;
-    let created = {
+    let wal_values = values.clone();
+    let (created, previous_values) = {
         let collection = collections
             .get_mut(&name)
             .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-        collection
-            .upsert_point(id, values.clone())
-            .map_err(map_collection_error)?
+        let previous_values = collection.get_point(id).map(|point| point.to_vec());
+        let created = collection
+            .upsert_point(id, values)
+            .map_err(map_collection_error)?;
+        (created, previous_values)
     };
 
-    persist_with_rollback(
+    if let Err(error) = persist_change_if_enabled(
         &state,
-        &mut collections,
-        previous_state,
-        WalRecord::UpsertPoint {
-            collection: name,
+        &collections,
+        &WalRecord::UpsertPoint {
+            collection: name.clone(),
             id,
-            values,
+            values: wal_values,
         },
-    )?;
+    ) {
+        let collection = collections
+            .get_mut(&name)
+            .ok_or_else(|| ApiError::internal("collection missing during upsert rollback"))?;
+        if let Some(previous_values) = previous_values {
+            collection
+                .upsert_point(id, previous_values)
+                .map_err(|_| ApiError::internal("failed to rollback upsert mutation"))?;
+        } else {
+            let _ = collection.remove_point(id);
+        }
+        return Err(error);
+    }
 
     Ok(Json(UpsertPointResponse { id, created }))
 }
@@ -257,38 +269,31 @@ pub(crate) async fn delete_point(
         .write()
         .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
 
-    let previous_state = collections.clone();
-    {
+    let removed_values = {
         let collection = collections
             .get_mut(&name)
             .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-        if collection.remove_point(id).is_none() {
-            return Err(ApiError::not_found(format!("point '{id}' not found")));
-        }
-    }
+        collection
+            .remove_point(id)
+            .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?
+    };
 
-    persist_with_rollback(
+    if let Err(error) = persist_change_if_enabled(
         &state,
-        &mut collections,
-        previous_state,
-        WalRecord::DeletePoint {
-            collection: name,
+        &collections,
+        &WalRecord::DeletePoint {
+            collection: name.clone(),
             id,
         },
-    )?;
-
-    Ok(Json(DeletePointResponse { id, deleted: true }))
-}
-
-fn persist_with_rollback(
-    state: &AppState,
-    collections: &mut BTreeMap<String, Collection>,
-    previous_state: BTreeMap<String, Collection>,
-    record: WalRecord,
-) -> Result<(), ApiError> {
-    if let Err(error) = persist_change_if_enabled(state, collections, &record) {
-        *collections = previous_state;
+    ) {
+        let collection = collections
+            .get_mut(&name)
+            .ok_or_else(|| ApiError::internal("collection missing during delete rollback"))?;
+        collection
+            .upsert_point(id, removed_values)
+            .map_err(|_| ApiError::internal("failed to rollback delete point mutation"))?;
         return Err(error);
     }
-    Ok(())
+
+    Ok(Json(DeletePointResponse { id, deleted: true }))
 }
