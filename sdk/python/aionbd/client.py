@@ -9,64 +9,64 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+
 class AionBDError(RuntimeError):
     """Raised when the AIONBD server returns an error or is unreachable."""
 
 @dataclass(frozen=True)
 class DistanceResult:
     """Represents a distance operation response."""
-
     metric: str
     value: float
+
 
 @dataclass(frozen=True)
 class SearchResult:
     """Represents a top-1 collection search response."""
-
     id: int
     metric: str
     value: float
 
+
 @dataclass(frozen=True)
 class CollectionInfo:
     """Represents collection metadata returned by the server."""
-
     name: str
     dimension: int
     strict_finite: bool
     point_count: int
 
+
 @dataclass(frozen=True)
 class UpsertPointResult:
     """Represents point upsert result."""
-
     id: int
     created: bool
+
 
 @dataclass(frozen=True)
 class PointResult:
     """Represents a stored point payload."""
-
     id: int
     values: list[float]
+
 
 @dataclass(frozen=True)
 class DeletePointResult:
     """Represents point delete result."""
-
     id: int
     deleted: bool
+
 
 @dataclass(frozen=True)
 class DeleteCollectionResult:
     """Represents collection delete result."""
-
     name: str
     deleted: bool
 
+
 class AionBDClient:
     """Small HTTP client targeting the AIONBD server skeleton."""
-
     def __init__(
         self, base_url: str = "http://127.0.0.1:8080", timeout: float = 5.0
     ) -> None:
@@ -213,14 +213,20 @@ class AionBDClient:
 
     def list_points(
         self, collection: str, offset: int = 0, limit: int = 100
-    ) -> list[int]:
-        """Lists point ids in a collection with offset/limit pagination."""
+    ) -> dict[str, Any]:
+        """Lists point ids in a collection with pagination metadata."""
         payload = self._request(
             "GET",
             f"/collections/{self._escaped(collection)}/points?offset={offset}&limit={limit}",
         )
         try:
-            return [int(item["id"]) for item in payload["points"]]
+            points = [int(item["id"]) for item in payload["points"]]
+            next_offset = payload["next_offset"]
+            return {
+                "points": points,
+                "total": int(payload["total"]),
+                "next_offset": None if next_offset is None else int(next_offset),
+            }
         except (KeyError, TypeError, ValueError) as exc:
             raise AionBDError(f"invalid list points response: {payload}") from exc
 
