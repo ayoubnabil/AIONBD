@@ -32,6 +32,14 @@ Run bench:
 cargo run --release -p aionbd-bench
 ```
 
+Bench scenarios:
+```bash
+AIONBD_BENCH_SCENARIO=all cargo run --release -p aionbd-bench
+AIONBD_BENCH_SCENARIO=dot cargo run --release -p aionbd-bench
+AIONBD_BENCH_SCENARIO=l2 cargo run --release -p aionbd-bench
+AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
+```
+
 ## Server runtime configuration
 
 - `AIONBD_BIND` (default: `127.0.0.1:8080`)
