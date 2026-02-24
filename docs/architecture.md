@@ -29,8 +29,7 @@ mixing concerns too early.
 
 ## Next architecture steps
 
-1. Add collection abstraction in `core/`.
+1. Add collection abstraction in `core/`. (done: in-memory typed collection + validation)
 2. Add persistence layer (WAL + snapshot) design in `core/`.
 3. Expand `server/` routes to CRUD collection/point operations.
 4. Add benchmark harness scenarios mapped to roadmap KPI.
-
