@@ -1,0 +1,9 @@
+[package]
+name = "aionbd-bench"
+version = "0.1.0"
+edition = "2021"
+license = "Proprietary"
+description = "Micro-benchmark CLI for AIONBD."
+
+[dependencies]
+aionbd-core = { path = "../core" }
