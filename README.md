@@ -43,6 +43,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().health())"
   - `GET /ready`
   - `POST /distance`
   - `POST /collections`
+  - `GET /collections`
   - `GET /collections/:name`
   - `PUT /collections/:name/points/:id`
   - `GET /collections/:name/points/:id`

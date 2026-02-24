@@ -12,8 +12,8 @@ use crate::config::AppConfig;
 use crate::errors::{map_collection_error, map_json_rejection, map_vector_error, ApiError};
 use crate::models::{
     CollectionResponse, CreateCollectionRequest, DeletePointResponse, DistanceRequest,
-    DistanceResponse, LiveResponse, Metric, PointResponse, ReadyChecks, ReadyResponse,
-    UpsertPointRequest, UpsertPointResponse,
+    DistanceResponse, ListCollectionsResponse, LiveResponse, Metric, PointResponse, ReadyChecks,
+    ReadyResponse, UpsertPointRequest, UpsertPointResponse,
 };
 use crate::state::AppState;
 
@@ -101,6 +101,21 @@ pub(crate) async fn create_collection(
     collections.insert(name, collection);
 
     Ok(Json(response))
+}
+
+pub(crate) async fn list_collections(
+    State(state): State<AppState>,
+) -> Result<Json<ListCollectionsResponse>, ApiError> {
+    let collections = state
+        .collections
+        .read()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    let items = collections
+        .values()
+        .map(build_collection_response)
+        .collect();
+    Ok(Json(ListCollectionsResponse { collections: items }))
 }
 
 pub(crate) async fn get_collection(

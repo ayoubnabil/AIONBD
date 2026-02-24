@@ -31,11 +31,14 @@ mod errors;
 mod handlers;
 mod models;
 mod state;
+#[cfg(test)]
+mod tests;
 
 use crate::config::AppConfig;
 use crate::errors::handle_middleware_error;
 use crate::handlers::{
-    create_collection, delete_point, distance, get_collection, get_point, live, ready, upsert_point,
+    create_collection, delete_point, distance, get_collection, get_point, list_collections, live,
+    ready, upsert_point,
 };
 use crate::state::AppState;
 
@@ -70,7 +73,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_app(state: AppState) -> Router {
+pub(crate) fn build_app(state: AppState) -> Router {
     let request_id_header = HeaderName::from_static("x-request-id");
     let config = state.config.clone();
     let timeout = Duration::from_millis(config.request_timeout_ms);
@@ -107,7 +110,10 @@ fn build_app(state: AppState) -> Router {
         .route("/live", get(live))
         .route("/ready", get(ready))
         .route("/distance", post(distance))
-        .route("/collections", post(create_collection))
+        .route(
+            "/collections",
+            post(create_collection).get(list_collections),
+        )
         .route("/collections/:name", get(get_collection))
         .route(
             "/collections/:name/points/:id",

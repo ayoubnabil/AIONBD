@@ -58,6 +58,11 @@ pub(crate) struct CollectionResponse {
     pub(crate) point_count: usize,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct ListCollectionsResponse {
+    pub(crate) collections: Vec<CollectionResponse>,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct UpsertPointRequest {
     pub(crate) values: Vec<f32>,
