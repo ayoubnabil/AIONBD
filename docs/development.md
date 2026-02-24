@@ -46,6 +46,11 @@ cargo run --release -p aionbd-bench
 - `GET /live`: liveness endpoint
 - `GET /ready`: readiness endpoint
 - `POST /distance`: vector operation endpoint with input validation
+- `POST /collections`: create collection `{name, dimension, strict_finite}`
+- `GET /collections/:name`: collection metadata
+- `PUT /collections/:name/points/:id`: upsert point `{values}`
+- `GET /collections/:name/points/:id`: read point
+- `DELETE /collections/:name/points/:id`: delete point
 
 ## Python SDK commands
 

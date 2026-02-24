@@ -1,4 +1,4 @@
-use aionbd_core::VectorError;
+use aionbd_core::{CollectionError, VectorError};
 use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -35,6 +35,22 @@ impl ApiError {
         }
     }
 
+    pub(crate) fn not_found(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            code: "not_found",
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn conflict(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            code: "conflict",
+            message: message.into(),
+        }
+    }
+
     fn request_timeout() -> Self {
         Self {
             status: StatusCode::REQUEST_TIMEOUT,
@@ -51,7 +67,7 @@ impl ApiError {
         }
     }
 
-    fn internal(message: impl Into<String>) -> Self {
+    pub(crate) fn internal(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             code: "internal",
@@ -97,6 +113,10 @@ pub(crate) fn map_vector_error(error: VectorError) -> ApiError {
             ApiError::invalid_argument("vectors must only contain finite values")
         }
     }
+}
+
+pub(crate) fn map_collection_error(error: CollectionError) -> ApiError {
+    ApiError::invalid_argument(error.to_string())
 }
 
 pub(crate) async fn handle_middleware_error(error: BoxError) -> Response {

@@ -41,3 +41,46 @@ pub(crate) struct ReadyResponse {
     pub(crate) uptime_ms: u64,
     pub(crate) checks: ReadyChecks,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CreateCollectionRequest {
+    pub(crate) name: String,
+    pub(crate) dimension: usize,
+    #[serde(default = "default_true")]
+    pub(crate) strict_finite: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CollectionResponse {
+    pub(crate) name: String,
+    pub(crate) dimension: usize,
+    pub(crate) strict_finite: bool,
+    pub(crate) point_count: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct UpsertPointRequest {
+    pub(crate) values: Vec<f32>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct UpsertPointResponse {
+    pub(crate) id: u64,
+    pub(crate) created: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PointResponse {
+    pub(crate) id: u64,
+    pub(crate) values: Vec<f32>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct DeletePointResponse {
+    pub(crate) id: u64,
+    pub(crate) deleted: bool,
+}
+
+const fn default_true() -> bool {
+    true
+}

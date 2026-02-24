@@ -1,17 +1,19 @@
 use std::sync::atomic::Ordering;
 
 use aionbd_core::{
-    cosine_similarity_with_options, dot_product_with_options, l2_distance_with_options,
-    VectorValidationOptions,
+    cosine_similarity_with_options, dot_product_with_options, l2_distance_with_options, Collection,
+    CollectionConfig, VectorValidationOptions,
 };
 use axum::extract::rejection::JsonRejection;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::Json;
 
 use crate::config::AppConfig;
-use crate::errors::{map_json_rejection, map_vector_error, ApiError};
+use crate::errors::{map_collection_error, map_json_rejection, map_vector_error, ApiError};
 use crate::models::{
-    DistanceRequest, DistanceResponse, LiveResponse, Metric, ReadyChecks, ReadyResponse,
+    CollectionResponse, CreateCollectionRequest, DeletePointResponse, DistanceRequest,
+    DistanceResponse, LiveResponse, Metric, PointResponse, ReadyChecks, ReadyResponse,
+    UpsertPointRequest, UpsertPointResponse,
 };
 use crate::state::AppState;
 
@@ -73,6 +75,123 @@ pub(crate) async fn distance(
     }))
 }
 
+pub(crate) async fn create_collection(
+    State(state): State<AppState>,
+    payload: Result<Json<CreateCollectionRequest>, JsonRejection>,
+) -> Result<Json<CollectionResponse>, ApiError> {
+    let Json(payload) = payload.map_err(map_json_rejection)?;
+    let name = canonical_collection_name(&payload.name)?;
+
+    let config = CollectionConfig::new(payload.dimension, payload.strict_finite)
+        .map_err(map_collection_error)?;
+    let collection = Collection::new(name.clone(), config).map_err(map_collection_error)?;
+
+    let mut collections = state
+        .collections
+        .write()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    if collections.contains_key(&name) {
+        return Err(ApiError::conflict(format!(
+            "collection '{name}' already exists"
+        )));
+    }
+
+    let response = build_collection_response(&collection);
+    collections.insert(name, collection);
+
+    Ok(Json(response))
+}
+
+pub(crate) async fn get_collection(
+    Path(name): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<CollectionResponse>, ApiError> {
+    let name = canonical_collection_name(&name)?;
+
+    let collections = state
+        .collections
+        .read()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    let collection = collections
+        .get(&name)
+        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
+
+    Ok(Json(build_collection_response(collection)))
+}
+
+pub(crate) async fn upsert_point(
+    Path((name, id)): Path<(String, u64)>,
+    State(state): State<AppState>,
+    payload: Result<Json<UpsertPointRequest>, JsonRejection>,
+) -> Result<Json<UpsertPointResponse>, ApiError> {
+    let name = canonical_collection_name(&name)?;
+    let Json(payload) = payload.map_err(map_json_rejection)?;
+
+    let mut collections = state
+        .collections
+        .write()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    let collection = collections
+        .get_mut(&name)
+        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
+
+    let created = collection
+        .upsert_point(id, payload.values)
+        .map_err(map_collection_error)?;
+
+    Ok(Json(UpsertPointResponse { id, created }))
+}
+
+pub(crate) async fn get_point(
+    Path((name, id)): Path<(String, u64)>,
+    State(state): State<AppState>,
+) -> Result<Json<PointResponse>, ApiError> {
+    let name = canonical_collection_name(&name)?;
+
+    let collections = state
+        .collections
+        .read()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    let collection = collections
+        .get(&name)
+        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
+
+    let values = collection
+        .get_point(id)
+        .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?;
+
+    Ok(Json(PointResponse {
+        id,
+        values: values.to_vec(),
+    }))
+}
+
+pub(crate) async fn delete_point(
+    Path((name, id)): Path<(String, u64)>,
+    State(state): State<AppState>,
+) -> Result<Json<DeletePointResponse>, ApiError> {
+    let name = canonical_collection_name(&name)?;
+
+    let mut collections = state
+        .collections
+        .write()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    let collection = collections
+        .get_mut(&name)
+        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
+
+    if collection.remove_point(id).is_none() {
+        return Err(ApiError::not_found(format!("point '{id}' not found")));
+    }
+
+    Ok(Json(DeletePointResponse { id, deleted: true }))
+}
+
 fn validate_distance_request(
     payload: &DistanceRequest,
     config: &AppConfig,
@@ -111,4 +230,24 @@ fn validate_distance_request(
 
 fn first_non_finite_index(values: &[f32]) -> Option<usize> {
     values.iter().position(|value| !value.is_finite())
+}
+
+fn canonical_collection_name(name: &str) -> Result<String, ApiError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(ApiError::invalid_argument(
+            "collection name must not be empty",
+        ));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn build_collection_response(collection: &Collection) -> CollectionResponse {
+    CollectionResponse {
+        name: collection.name().to_string(),
+        dimension: collection.dimension(),
+        strict_finite: collection.strict_finite(),
+        point_count: collection.len(),
+    }
 }

@@ -5,6 +5,9 @@
 //! - `GET /live`: process liveness
 //! - `GET /ready`: readiness (engine/storage checks)
 //! - `POST /distance`: validated vector operation endpoint
+//! - `POST /collections`: create an in-memory collection
+//! - `GET /collections/:name`: collection metadata
+//! - `PUT/GET/DELETE /collections/:name/points/:id`: point CRUD
 
 use std::time::Duration;
 
@@ -12,7 +15,7 @@ use anyhow::{Context, Result};
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderName, Request};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::Router;
 use tower::limit::ConcurrencyLimitLayer;
 use tower::timeout::TimeoutLayer;
@@ -31,7 +34,9 @@ mod state;
 
 use crate::config::AppConfig;
 use crate::errors::handle_middleware_error;
-use crate::handlers::{distance, live, ready};
+use crate::handlers::{
+    create_collection, delete_point, distance, get_collection, get_point, live, ready, upsert_point,
+};
 use crate::state::AppState;
 
 #[tokio::main]
@@ -102,6 +107,12 @@ fn build_app(state: AppState) -> Router {
         .route("/live", get(live))
         .route("/ready", get(ready))
         .route("/distance", post(distance))
+        .route("/collections", post(create_collection))
+        .route("/collections/:name", get(get_collection))
+        .route(
+            "/collections/:name/points/:id",
+            put(upsert_point).get(get_point).delete(delete_point),
+        )
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         .layer(middleware)
         .with_state(state)
