@@ -106,6 +106,31 @@ pub(crate) struct SearchResponse {
     pub(crate) value: f32,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SearchTopKRequest {
+    pub(crate) query: Vec<f32>,
+    #[serde(default)]
+    pub(crate) metric: Metric,
+    #[serde(default = "default_limit")]
+    pub(crate) limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct SearchHit {
+    pub(crate) id: u64,
+    pub(crate) value: f32,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct SearchTopKResponse {
+    pub(crate) metric: Metric,
+    pub(crate) hits: Vec<SearchHit>,
+}
+
 const fn default_true() -> bool {
     true
+}
+
+const fn default_limit() -> usize {
+    10
 }

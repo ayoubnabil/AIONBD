@@ -9,6 +9,7 @@
 //! - `GET/DELETE /collections/:name`: collection metadata and deletion
 //! - `PUT/GET/DELETE /collections/:name/points/:id`: point CRUD
 //! - `POST /collections/:name/search`: top-1 nearest/most similar point
+//! - `POST /collections/:name/search/topk`: top-k nearest/most similar points
 
 use std::time::Duration;
 
@@ -45,7 +46,7 @@ use crate::handlers::{
     create_collection, delete_collection, delete_point, distance, get_collection, get_point,
     list_collections, live, ready, upsert_point,
 };
-use crate::handlers_search::search_collection;
+use crate::handlers_search::{search_collection, search_collection_top_k};
 use crate::state::AppState;
 
 #[tokio::main]
@@ -129,6 +130,10 @@ pub(crate) fn build_app(state: AppState) -> Router {
             get(get_collection).delete(delete_collection),
         )
         .route("/collections/:name/search", post(search_collection))
+        .route(
+            "/collections/:name/search/topk",
+            post(search_collection_top_k),
+        )
         .route(
             "/collections/:name/points/:id",
             put(upsert_point).get(get_point).delete(delete_point),

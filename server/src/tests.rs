@@ -9,6 +9,7 @@ use crate::state::AppState;
 
 mod collection_deletion;
 mod persistence;
+mod search;
 
 fn test_state() -> AppState {
     let config = AppConfig {

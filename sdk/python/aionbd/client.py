@@ -167,6 +167,31 @@ class AionBDClient:
         except (KeyError, TypeError, ValueError) as exc:
             raise AionBDError(f"invalid search response: {payload}") from exc
 
+    def search_collection_top_k(
+        self, collection: str, query: list[float], limit: int = 10, metric: str = "dot"
+    ) -> list[SearchResult]:
+        """Runs top-k search in a collection using the selected metric."""
+        payload = self._request(
+            "POST",
+            f"/collections/{self._escaped(collection)}/search/topk",
+            {"query": query, "metric": metric, "limit": limit},
+        )
+        try:
+            response_metric = str(payload["metric"])
+            hits = payload["hits"]
+            if not isinstance(hits, list):
+                raise TypeError("hits must be a list")
+            return [
+                SearchResult(
+                    id=int(hit["id"]),
+                    metric=response_metric,
+                    value=float(hit["value"]),
+                )
+                for hit in hits
+            ]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid top-k search response: {payload}") from exc
+
     def upsert_point(
         self, collection: str, point_id: int, values: list[float]
     ) -> UpsertPointResult:
