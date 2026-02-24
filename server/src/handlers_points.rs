@@ -25,17 +25,13 @@ pub(crate) async fn list_points(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let ids = collection.point_ids();
-    let total = ids.len();
-    let points: Vec<PointIdResponse> = ids
-        .into_iter()
-        .skip(query.offset)
-        .take(query.limit)
-        .map(|id| PointIdResponse { id })
-        .collect();
+    let total = collection.len();
+    let ids = collection.point_ids_page(query.offset, query.limit);
+    let points: Vec<PointIdResponse> = ids.into_iter().map(|id| PointIdResponse { id }).collect();
 
-    let next_offset = if query.offset + points.len() < total {
-        Some(query.offset + points.len())
+    let consumed = query.offset.saturating_add(points.len());
+    let next_offset = if consumed < total {
+        Some(consumed)
     } else {
         None
     };

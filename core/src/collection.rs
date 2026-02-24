@@ -112,6 +112,15 @@ impl Collection {
         self.points.keys().copied().collect()
     }
 
+    pub fn point_ids_page(&self, offset: usize, limit: usize) -> Vec<PointId> {
+        self.points
+            .keys()
+            .skip(offset)
+            .take(limit)
+            .copied()
+            .collect()
+    }
+
     fn validate_vector(&self, values: &[f32]) -> Result<(), CollectionError> {
         if values.len() != self.config.dimension {
             return Err(CollectionError::InvalidDimension {
@@ -228,5 +237,28 @@ mod tests {
             .expect("must succeed");
 
         assert_eq!(collection.point_ids(), vec![10, 30, 50]);
+    }
+
+    #[test]
+    fn point_ids_page_respects_offset_and_limit() {
+        let mut collection = new_collection(true);
+        collection
+            .upsert_point(10, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+        collection
+            .upsert_point(30, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+        collection
+            .upsert_point(50, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+        collection
+            .upsert_point(70, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+
+        assert_eq!(collection.point_ids_page(0, 2), vec![10, 30]);
+        assert_eq!(collection.point_ids_page(1, 2), vec![30, 50]);
+        assert_eq!(collection.point_ids_page(3, 10), vec![70]);
+        assert!(collection.point_ids_page(10, 2).is_empty());
+        assert!(collection.point_ids_page(0, 0).is_empty());
     }
 }
