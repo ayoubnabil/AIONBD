@@ -69,6 +69,14 @@ class DeletePointResult:
     deleted: bool
 
 
+@dataclass(frozen=True)
+class DeleteCollectionResult:
+    """Represents collection delete result."""
+
+    name: str
+    deleted: bool
+
+
 class AionBDClient:
     """Small HTTP client targeting the AIONBD server skeleton."""
 
@@ -202,6 +210,17 @@ class AionBDClient:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise AionBDError(f"invalid delete point response: {payload}") from exc
+
+    def delete_collection(self, name: str) -> DeleteCollectionResult:
+        """Deletes a collection."""
+        payload = self._request("DELETE", f"/collections/{self._escaped(name)}")
+        try:
+            return DeleteCollectionResult(
+                name=str(payload["name"]),
+                deleted=bool(payload["deleted"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid delete collection response: {payload}") from exc
 
     def _parse_collection(self, payload: Any) -> CollectionInfo:
         try:

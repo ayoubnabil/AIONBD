@@ -7,6 +7,7 @@ use crate::build_app;
 use crate::config::AppConfig;
 use crate::state::AppState;
 
+mod collection_deletion;
 mod persistence;
 
 fn test_state() -> AppState {

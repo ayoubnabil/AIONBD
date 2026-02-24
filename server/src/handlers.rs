@@ -14,9 +14,9 @@ use crate::handler_utils::{
     build_collection_response, canonical_collection_name, validate_distance_request,
 };
 use crate::models::{
-    CollectionResponse, CreateCollectionRequest, DeletePointResponse, DistanceRequest,
-    DistanceResponse, ListCollectionsResponse, LiveResponse, Metric, PointResponse, ReadyChecks,
-    ReadyResponse, UpsertPointRequest, UpsertPointResponse,
+    CollectionResponse, CreateCollectionRequest, DeleteCollectionResponse, DeletePointResponse,
+    DistanceRequest, DistanceResponse, ListCollectionsResponse, LiveResponse, Metric,
+    PointResponse, ReadyChecks, ReadyResponse, UpsertPointRequest, UpsertPointResponse,
 };
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
@@ -150,6 +150,37 @@ pub(crate) async fn get_collection(
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
     Ok(Json(build_collection_response(collection)))
+}
+
+pub(crate) async fn delete_collection(
+    Path(name): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<DeleteCollectionResponse>, ApiError> {
+    let name = canonical_collection_name(&name)?;
+
+    let mut collections = state
+        .collections
+        .write()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+    let previous_state = collections.clone();
+    if collections.remove(&name).is_none() {
+        return Err(ApiError::not_found(format!(
+            "collection '{name}' not found"
+        )));
+    }
+
+    persist_with_rollback(
+        &state,
+        &mut collections,
+        previous_state,
+        WalRecord::DeleteCollection { name: name.clone() },
+    )?;
+
+    Ok(Json(DeleteCollectionResponse {
+        name,
+        deleted: true,
+    }))
 }
 
 pub(crate) async fn upsert_point(

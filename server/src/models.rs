@@ -86,6 +86,12 @@ pub(crate) struct DeletePointResponse {
     pub(crate) deleted: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct DeleteCollectionResponse {
+    pub(crate) name: String,
+    pub(crate) deleted: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct SearchRequest {
     pub(crate) query: Vec<f32>,

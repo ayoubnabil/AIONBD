@@ -25,4 +25,5 @@ print(client.upsert_point("demo", 1, [1.0, 2.0, 3.0]))
 print(client.search_collection("demo", [1.0, 2.0, 3.0], metric="dot"))
 print(client.get_point("demo", 1))
 print(client.delete_point("demo", 1))
+print(client.delete_collection("demo"))
 ```

@@ -6,7 +6,7 @@
 //! - `GET /ready`: readiness (engine/storage checks)
 //! - `POST /distance`: validated vector operation endpoint
 //! - `POST /collections`: create an in-memory collection
-//! - `GET /collections/:name`: collection metadata
+//! - `GET/DELETE /collections/:name`: collection metadata and deletion
 //! - `PUT/GET/DELETE /collections/:name/points/:id`: point CRUD
 //! - `POST /collections/:name/search`: top-1 nearest/most similar point
 
@@ -42,8 +42,8 @@ mod tests;
 use crate::config::AppConfig;
 use crate::errors::handle_middleware_error;
 use crate::handlers::{
-    create_collection, delete_point, distance, get_collection, get_point, list_collections, live,
-    ready, upsert_point,
+    create_collection, delete_collection, delete_point, distance, get_collection, get_point,
+    list_collections, live, ready, upsert_point,
 };
 use crate::handlers_search::search_collection;
 use crate::state::AppState;
@@ -124,7 +124,10 @@ pub(crate) fn build_app(state: AppState) -> Router {
             "/collections",
             post(create_collection).get(list_collections),
         )
-        .route("/collections/:name", get(get_collection))
+        .route(
+            "/collections/:name",
+            get(get_collection).delete(delete_collection),
+        )
         .route("/collections/:name/search", post(search_collection))
         .route(
             "/collections/:name/points/:id",

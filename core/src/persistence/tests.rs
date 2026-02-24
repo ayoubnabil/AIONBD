@@ -63,6 +63,38 @@ fn wal_records_apply_in_order() {
 }
 
 #[test]
+fn delete_collection_wal_record_is_idempotent() {
+    let mut collections = BTreeMap::<String, Collection>::new();
+
+    apply_wal_record(
+        &mut collections,
+        &WalRecord::CreateCollection {
+            name: "demo".to_string(),
+            dimension: 3,
+            strict_finite: true,
+        },
+    )
+    .expect("create must succeed");
+
+    apply_wal_record(
+        &mut collections,
+        &WalRecord::DeleteCollection {
+            name: "demo".to_string(),
+        },
+    )
+    .expect("delete should succeed");
+    apply_wal_record(
+        &mut collections,
+        &WalRecord::DeleteCollection {
+            name: "demo".to_string(),
+        },
+    )
+    .expect("delete replay should be idempotent");
+
+    assert!(!collections.contains_key("demo"));
+}
+
+#[test]
 fn persist_change_roundtrip_restores_data() {
     let (root, snapshot_path, wal_path) = test_paths("roundtrip");
 
