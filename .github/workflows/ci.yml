@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: File size guard
+        run: ./scripts/check_file_sizes.sh
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Format check

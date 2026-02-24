@@ -61,3 +61,11 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().health())"
 2. Public interfaces should be documented.
 3. New features must include at least baseline tests.
 4. Bench-visible changes must document expected impact.
+5. Avoid oversized files: split files before they exceed 300 lines.
+
+## Git and review policy
+
+1. Every change must be done on a dedicated branch.
+2. Direct work on `main` is forbidden.
+3. Every branch must be reviewed by an expert before merge.
+4. Merge to `main` is allowed only after explicit expert validation.

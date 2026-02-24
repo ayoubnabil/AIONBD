@@ -37,6 +37,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().health())"
 
 - `ROADMAP_EDGEVECTOR.md` is ignored intentionally in git.
 - This step focuses on project structure and baseline quality.
+- Contribution flow is branch-first local with mandatory expert review before merge (`CONTRIBUTING.md`).
 - Server endpoints:
   - `GET /live`
   - `GET /ready`
