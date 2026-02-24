@@ -1,8 +1,4 @@
-"""Minimal HTTP client for AIONBD.
-
-The implementation intentionally uses only Python standard library modules,
-which keeps the initial SDK easy to audit and portable.
-"""
+"""Minimal HTTP client for AIONBD using Python standard library only."""
 
 from __future__ import annotations
 
@@ -13,10 +9,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-
 class AionBDError(RuntimeError):
     """Raised when the AIONBD server returns an error or is unreachable."""
-
 
 @dataclass(frozen=True)
 class DistanceResult:
@@ -25,7 +19,6 @@ class DistanceResult:
     metric: str
     value: float
 
-
 @dataclass(frozen=True)
 class SearchResult:
     """Represents a top-1 collection search response."""
@@ -33,7 +26,6 @@ class SearchResult:
     id: int
     metric: str
     value: float
-
 
 @dataclass(frozen=True)
 class CollectionInfo:
@@ -44,14 +36,12 @@ class CollectionInfo:
     strict_finite: bool
     point_count: int
 
-
 @dataclass(frozen=True)
 class UpsertPointResult:
     """Represents point upsert result."""
 
     id: int
     created: bool
-
 
 @dataclass(frozen=True)
 class PointResult:
@@ -60,7 +50,6 @@ class PointResult:
     id: int
     values: list[float]
 
-
 @dataclass(frozen=True)
 class DeletePointResult:
     """Represents point delete result."""
@@ -68,14 +57,12 @@ class DeletePointResult:
     id: int
     deleted: bool
 
-
 @dataclass(frozen=True)
 class DeleteCollectionResult:
     """Represents collection delete result."""
 
     name: str
     deleted: bool
-
 
 class AionBDClient:
     """Small HTTP client targeting the AIONBD server skeleton."""
@@ -224,6 +211,19 @@ class AionBDClient:
         except (KeyError, TypeError, ValueError) as exc:
             raise AionBDError(f"invalid get point response: {payload}") from exc
 
+    def list_points(
+        self, collection: str, offset: int = 0, limit: int = 100
+    ) -> list[int]:
+        """Lists point ids in a collection with offset/limit pagination."""
+        payload = self._request(
+            "GET",
+            f"/collections/{self._escaped(collection)}/points?offset={offset}&limit={limit}",
+        )
+        try:
+            return [int(item["id"]) for item in payload["points"]]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid list points response: {payload}") from exc
+
     def delete_point(self, collection: str, point_id: int) -> DeletePointResult:
         """Deletes a point from a collection."""
         payload = self._request(
@@ -241,8 +241,7 @@ class AionBDClient:
         payload = self._request("DELETE", f"/collections/{self._escaped(name)}")
         try:
             return DeleteCollectionResult(
-                name=str(payload["name"]),
-                deleted=bool(payload["deleted"]),
+                name=str(payload["name"]), deleted=bool(payload["deleted"])
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise AionBDError(f"invalid delete collection response: {payload}") from exc

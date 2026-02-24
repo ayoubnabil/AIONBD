@@ -8,6 +8,7 @@ use crate::config::AppConfig;
 use crate::state::AppState;
 
 mod collection_deletion;
+mod list_points;
 mod persistence;
 mod search;
 

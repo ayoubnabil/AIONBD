@@ -48,6 +48,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
   - `DELETE /collections/:name`
   - `POST /collections/:name/search`
   - `POST /collections/:name/search/topk`
+  - `GET /collections/:name/points`
   - `PUT /collections/:name/points/:id`
   - `GET /collections/:name/points/:id`
   - `DELETE /collections/:name/points/:id`

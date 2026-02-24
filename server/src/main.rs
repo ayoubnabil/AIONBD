@@ -8,6 +8,7 @@
 //! - `POST /collections`: create an in-memory collection
 //! - `GET/DELETE /collections/:name`: collection metadata and deletion
 //! - `PUT/GET/DELETE /collections/:name/points/:id`: point CRUD
+//! - `GET /collections/:name/points`: paginated list of point ids
 //! - `POST /collections/:name/search`: top-1 nearest/most similar point
 //! - `POST /collections/:name/search/topk`: top-k nearest/most similar points
 
@@ -33,6 +34,7 @@ mod config;
 mod errors;
 mod handler_utils;
 mod handlers;
+mod handlers_points;
 mod handlers_search;
 mod models;
 mod persistence;
@@ -46,6 +48,7 @@ use crate::handlers::{
     create_collection, delete_collection, delete_point, distance, get_collection, get_point,
     list_collections, live, ready, upsert_point,
 };
+use crate::handlers_points::list_points;
 use crate::handlers_search::{search_collection, search_collection_top_k};
 use crate::state::AppState;
 
@@ -134,6 +137,7 @@ pub(crate) fn build_app(state: AppState) -> Router {
             "/collections/:name/search/topk",
             post(search_collection_top_k),
         )
+        .route("/collections/:name/points", get(list_points))
         .route(
             "/collections/:name/points/:id",
             put(upsert_point).get(get_point).delete(delete_point),

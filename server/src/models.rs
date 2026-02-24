@@ -93,6 +93,26 @@ pub(crate) struct DeleteCollectionResponse {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct ListPointsQuery {
+    #[serde(default)]
+    pub(crate) offset: usize,
+    #[serde(default = "default_page_limit")]
+    pub(crate) limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PointIdResponse {
+    pub(crate) id: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ListPointsResponse {
+    pub(crate) points: Vec<PointIdResponse>,
+    pub(crate) total: usize,
+    pub(crate) next_offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SearchRequest {
     pub(crate) query: Vec<f32>,
     #[serde(default)]
@@ -133,4 +153,8 @@ const fn default_true() -> bool {
 
 const fn default_limit() -> usize {
     10
+}
+
+const fn default_page_limit() -> usize {
+    100
 }

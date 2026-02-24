@@ -63,6 +63,7 @@ AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
 - `DELETE /collections/:name`: delete collection
 - `POST /collections/:name/search`: top-1 search `{query, metric}`
 - `POST /collections/:name/search/topk`: top-k search `{query, metric, limit}`
+- `GET /collections/:name/points`: list point ids `?offset=<n>&limit=<n>`
 - `PUT /collections/:name/points/:id`: upsert point `{values}`
 - `GET /collections/:name/points/:id`: read point
 - `DELETE /collections/:name/points/:id`: delete point
