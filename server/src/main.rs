@@ -8,6 +8,7 @@
 //! - `POST /collections`: create an in-memory collection
 //! - `GET /collections/:name`: collection metadata
 //! - `PUT/GET/DELETE /collections/:name/points/:id`: point CRUD
+//! - `POST /collections/:name/search`: top-1 nearest/most similar point
 
 use std::time::Duration;
 
@@ -31,6 +32,7 @@ mod config;
 mod errors;
 mod handler_utils;
 mod handlers;
+mod handlers_search;
 mod models;
 mod persistence;
 mod state;
@@ -43,6 +45,7 @@ use crate::handlers::{
     create_collection, delete_point, distance, get_collection, get_point, list_collections, live,
     ready, upsert_point,
 };
+use crate::handlers_search::search_collection;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -122,6 +125,7 @@ pub(crate) fn build_app(state: AppState) -> Router {
             post(create_collection).get(list_collections),
         )
         .route("/collections/:name", get(get_collection))
+        .route("/collections/:name/search", post(search_collection))
         .route(
             "/collections/:name/points/:id",
             put(upsert_point).get(get_point).delete(delete_point),

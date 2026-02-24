@@ -22,6 +22,7 @@ collection = client.create_collection("demo", dimension=3, strict_finite=True)
 print(collection)
 print(client.list_collections())
 print(client.upsert_point("demo", 1, [1.0, 2.0, 3.0]))
+print(client.search_collection("demo", [1.0, 2.0, 3.0], metric="dot"))
 print(client.get_point("demo", 1))
 print(client.delete_point("demo", 1))
 ```

@@ -27,6 +27,15 @@ class DistanceResult:
 
 
 @dataclass(frozen=True)
+class SearchResult:
+    """Represents a top-1 collection search response."""
+
+    id: int
+    metric: str
+    value: float
+
+
+@dataclass(frozen=True)
 class CollectionInfo:
     """Represents collection metadata returned by the server."""
 
@@ -131,6 +140,24 @@ class AionBDClient:
         """Reads collection metadata."""
         payload = self._request("GET", f"/collections/{self._escaped(name)}")
         return self._parse_collection(payload)
+
+    def search_collection(
+        self, collection: str, query: list[float], metric: str = "dot"
+    ) -> SearchResult:
+        """Runs top-1 search in a collection using the selected metric."""
+        payload = self._request(
+            "POST",
+            f"/collections/{self._escaped(collection)}/search",
+            {"query": query, "metric": metric},
+        )
+        try:
+            return SearchResult(
+                id=int(payload["id"]),
+                metric=str(payload["metric"]),
+                value=float(payload["value"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid search response: {payload}") from exc
 
     def upsert_point(
         self, collection: str, point_id: int, values: list[float]

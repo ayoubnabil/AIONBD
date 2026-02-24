@@ -235,3 +235,61 @@ async fn list_collections_returns_sorted_names() {
     assert_eq!(list_json["collections"][0]["name"], "alpha");
     assert_eq!(list_json["collections"][1]["name"], "zeta");
 }
+
+#[tokio::test]
+async fn search_collection_returns_best_match() {
+    let app = build_app(test_state());
+
+    let create_req = Request::builder()
+        .method("POST")
+        .uri("/collections")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"name": "search_demo", "dimension": 3}).to_string(),
+        ))
+        .expect("request must build");
+    let create_resp = app
+        .clone()
+        .oneshot(create_req)
+        .await
+        .expect("response expected");
+    assert_eq!(create_resp.status(), StatusCode::OK);
+
+    for (id, values) in [
+        (1u64, json!([1.0, 0.0, 0.0])),
+        (2u64, json!([0.1, 0.0, 0.0])),
+    ] {
+        let upsert_req = Request::builder()
+            .method("PUT")
+            .uri(format!("/collections/search_demo/points/{id}"))
+            .header("content-type", "application/json")
+            .body(Body::from(json!({"values": values}).to_string()))
+            .expect("request must build");
+
+        let upsert_resp = app
+            .clone()
+            .oneshot(upsert_req)
+            .await
+            .expect("response expected");
+        assert_eq!(upsert_resp.status(), StatusCode::OK);
+    }
+
+    let search_req = Request::builder()
+        .method("POST")
+        .uri("/collections/search_demo/search")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"query": [1.0, 0.0, 0.0], "metric": "dot"}).to_string(),
+        ))
+        .expect("request must build");
+    let search_resp = app
+        .clone()
+        .oneshot(search_req)
+        .await
+        .expect("response expected");
+    assert_eq!(search_resp.status(), StatusCode::OK);
+
+    let search_json = json_body(search_resp).await;
+    assert_eq!(search_json["id"], 1);
+    assert_eq!(search_json["metric"], "dot");
+}

@@ -7,6 +7,7 @@ from .client import (
     DeletePointResult,
     DistanceResult,
     PointResult,
+    SearchResult,
     UpsertPointResult,
 )
 
@@ -14,6 +15,7 @@ __all__ = [
     "AionBDClient",
     "AionBDError",
     "DistanceResult",
+    "SearchResult",
     "CollectionInfo",
     "UpsertPointResult",
     "PointResult",

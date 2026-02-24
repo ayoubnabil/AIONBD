@@ -86,6 +86,20 @@ pub(crate) struct DeletePointResponse {
     pub(crate) deleted: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SearchRequest {
+    pub(crate) query: Vec<f32>,
+    #[serde(default)]
+    pub(crate) metric: Metric,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct SearchResponse {
+    pub(crate) id: u64,
+    pub(crate) metric: Metric,
+    pub(crate) value: f32,
+}
+
 const fn default_true() -> bool {
     true
 }

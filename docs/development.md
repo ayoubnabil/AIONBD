@@ -60,6 +60,7 @@ AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
 - `POST /collections`: create collection `{name, dimension, strict_finite}`
 - `GET /collections`: list collections
 - `GET /collections/:name`: collection metadata
+- `POST /collections/:name/search`: top-1 search `{query, metric}`
 - `PUT /collections/:name/points/:id`: upsert point `{values}`
 - `GET /collections/:name/points/:id`: read point
 - `DELETE /collections/:name/points/:id`: delete point
