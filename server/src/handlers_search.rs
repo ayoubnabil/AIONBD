@@ -30,18 +30,16 @@ pub(crate) async fn search_collection(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let mut scored = score_collection(collection, &payload.query, payload.metric)?;
-    sort_scores(&mut scored, payload.metric);
-
-    let (id, value) = scored
+    let scored = score_collection(collection, &payload.query, payload.metric)?;
+    let best = select_top_k(scored, payload.metric, 1)
         .into_iter()
         .next()
         .ok_or_else(|| ApiError::invalid_argument("collection contains no points"))?;
 
     Ok(Json(SearchResponse {
-        id,
+        id: best.id,
         metric: payload.metric,
-        value,
+        value: best.value,
     }))
 }
 
@@ -66,14 +64,8 @@ pub(crate) async fn search_collection_top_k(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let mut scored = score_collection(collection, &payload.query, payload.metric)?;
-    sort_scores(&mut scored, payload.metric);
-
-    let hits = scored
-        .into_iter()
-        .take(payload.limit)
-        .map(|(id, value)| SearchHit { id, value })
-        .collect();
+    let scored = score_collection(collection, &payload.query, payload.metric)?;
+    let hits = select_top_k(scored, payload.metric, payload.limit);
 
     Ok(Json(SearchTopKResponse {
         metric: payload.metric,
@@ -132,4 +124,36 @@ fn sort_scores(scored: &mut [(u64, f32)], metric: Metric) {
             .total_cmp(&left.1)
             .then_with(|| left.0.cmp(&right.0)),
     });
+}
+
+fn select_top_k(mut scored: Vec<(u64, f32)>, metric: Metric, limit: usize) -> Vec<SearchHit> {
+    if scored.is_empty() || limit == 0 {
+        return Vec::new();
+    }
+
+    let keep = limit.min(scored.len());
+    if scored.len() > keep {
+        let nth = keep - 1;
+        scored.select_nth_unstable_by(nth, |left, right| compare_scores(left, right, metric));
+        scored.truncate(keep);
+    }
+
+    sort_scores(&mut scored, metric);
+    scored
+        .into_iter()
+        .map(|(id, value)| SearchHit { id, value })
+        .collect()
+}
+
+fn compare_scores(left: &(u64, f32), right: &(u64, f32), metric: Metric) -> std::cmp::Ordering {
+    match metric {
+        Metric::L2 => left
+            .1
+            .total_cmp(&right.1)
+            .then_with(|| left.0.cmp(&right.0)),
+        Metric::Dot | Metric::Cosine => right
+            .1
+            .total_cmp(&left.1)
+            .then_with(|| left.0.cmp(&right.0)),
+    }
 }
