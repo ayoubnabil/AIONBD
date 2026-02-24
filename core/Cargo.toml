@@ -6,3 +6,5 @@ license = "Proprietary"
 description = "Core vector primitives for AIONBD."
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

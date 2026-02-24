@@ -7,6 +7,8 @@ use crate::build_app;
 use crate::config::AppConfig;
 use crate::state::AppState;
 
+mod persistence;
+
 fn test_state() -> AppState {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
@@ -15,9 +17,12 @@ fn test_state() -> AppState {
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
         max_concurrency: 256,
+        persistence_enabled: false,
+        snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
+        wal_path: std::path::PathBuf::from("unused_wal.jsonl"),
     };
 
-    AppState::new(config)
+    AppState::with_collections(config, std::collections::BTreeMap::new())
 }
 
 async fn json_body(response: axum::response::Response) -> Value {

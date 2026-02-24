@@ -29,13 +29,16 @@ impl Clone for AppState {
 }
 
 impl AppState {
-    pub(crate) fn new(config: AppConfig) -> Self {
+    pub(crate) fn with_collections(
+        config: AppConfig,
+        collections: BTreeMap<String, Collection>,
+    ) -> Self {
         Self {
             started_at: Instant::now(),
             config: Arc::new(config),
             engine_loaded: Arc::new(AtomicBool::new(true)),
             storage_available: Arc::new(AtomicBool::new(true)),
-            collections: Arc::new(RwLock::new(BTreeMap::new())),
+            collections: Arc::new(RwLock::new(collections)),
         }
     }
 }

@@ -11,6 +11,7 @@
 
 use std::time::Duration;
 
+use aionbd_core::load_collections;
 use anyhow::{Context, Result};
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::DefaultBodyLimit;
@@ -28,8 +29,10 @@ use tracing_subscriber::EnvFilter;
 
 mod config;
 mod errors;
+mod handler_utils;
 mod handlers;
 mod models;
+mod persistence;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -47,8 +50,9 @@ async fn main() -> Result<()> {
     init_tracing();
 
     let config = AppConfig::from_env().context("invalid configuration")?;
+    let initial_collections = load_initial_collections(&config)?;
     let bind = config.bind;
-    let state = AppState::new(config.clone());
+    let state = AppState::with_collections(config.clone(), initial_collections);
     let app = build_app(state);
 
     let listener = tokio::net::TcpListener::bind(bind)
@@ -62,6 +66,9 @@ async fn main() -> Result<()> {
         timeout_ms = config.request_timeout_ms,
         max_body_bytes = config.max_body_bytes,
         max_concurrency = config.max_concurrency,
+        persistence_enabled = config.persistence_enabled,
+        snapshot_path = %config.snapshot_path.display(),
+        wal_path = %config.wal_path.display(),
         "aionbd server started"
     );
 
@@ -136,4 +143,20 @@ async fn shutdown_signal() {
         Ok(()) => tracing::info!("shutdown signal received"),
         Err(error) => tracing::error!(%error, "failed to install Ctrl-C handler"),
     }
+}
+
+fn load_initial_collections(
+    config: &AppConfig,
+) -> Result<std::collections::BTreeMap<String, aionbd_core::Collection>> {
+    if !config.persistence_enabled {
+        return Ok(std::collections::BTreeMap::new());
+    }
+
+    load_collections(&config.snapshot_path, &config.wal_path).with_context(|| {
+        format!(
+            "failed to load persisted data from snapshot '{}' and wal '{}'",
+            config.snapshot_path.display(),
+            config.wal_path.display()
+        )
+    })
 }

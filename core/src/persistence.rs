@@ -1,0 +1,285 @@
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::fmt;
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+use crate::{Collection, CollectionConfig, CollectionError, PointId};
+
+const SNAPSHOT_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WalRecord {
+    CreateCollection {
+        name: String,
+        dimension: usize,
+        strict_finite: bool,
+    },
+    UpsertPoint {
+        collection: String,
+        id: PointId,
+        values: Vec<f32>,
+    },
+    DeletePoint {
+        collection: String,
+        id: PointId,
+    },
+}
+
+#[derive(Debug)]
+pub enum PersistenceError {
+    Io(std::io::Error),
+    Serde(serde_json::Error),
+    Collection(CollectionError),
+    InvalidData(String),
+}
+
+impl fmt::Display for PersistenceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(f, "io error: {error}"),
+            Self::Serde(error) => write!(f, "serialization error: {error}"),
+            Self::Collection(error) => write!(f, "collection error: {error}"),
+            Self::InvalidData(message) => write!(f, "invalid persistence data: {message}"),
+        }
+    }
+}
+
+impl Error for PersistenceError {}
+
+impl From<std::io::Error> for PersistenceError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl From<serde_json::Error> for PersistenceError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Serde(value)
+    }
+}
+
+impl From<CollectionError> for PersistenceError {
+    fn from(value: CollectionError) -> Self {
+        Self::Collection(value)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SnapshotDocument {
+    version: u32,
+    collections: Vec<SnapshotCollection>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SnapshotCollection {
+    name: String,
+    dimension: usize,
+    strict_finite: bool,
+    points: Vec<SnapshotPoint>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SnapshotPoint {
+    id: PointId,
+    values: Vec<f32>,
+}
+
+pub fn load_collections(
+    snapshot_path: &Path,
+    wal_path: &Path,
+) -> Result<BTreeMap<String, Collection>, PersistenceError> {
+    let mut collections = load_snapshot(snapshot_path)?;
+    replay_wal(wal_path, &mut collections)?;
+    Ok(collections)
+}
+
+pub fn persist_change(
+    snapshot_path: &Path,
+    wal_path: &Path,
+    collections: &BTreeMap<String, Collection>,
+    record: &WalRecord,
+) -> Result<(), PersistenceError> {
+    append_wal(wal_path, record)?;
+    write_snapshot(snapshot_path, collections)?;
+    truncate_wal(wal_path)?;
+    Ok(())
+}
+
+pub fn apply_wal_record(
+    collections: &mut BTreeMap<String, Collection>,
+    record: &WalRecord,
+) -> Result<(), PersistenceError> {
+    match record {
+        WalRecord::CreateCollection {
+            name,
+            dimension,
+            strict_finite,
+        } => {
+            if collections.contains_key(name) {
+                return Err(PersistenceError::InvalidData(format!(
+                    "collection '{name}' already exists"
+                )));
+            }
+
+            let config = CollectionConfig::new(*dimension, *strict_finite)?;
+            let collection = Collection::new(name.clone(), config)?;
+            collections.insert(name.clone(), collection);
+            Ok(())
+        }
+        WalRecord::UpsertPoint {
+            collection,
+            id,
+            values,
+        } => {
+            let target = collections.get_mut(collection).ok_or_else(|| {
+                PersistenceError::InvalidData(format!("collection '{collection}' does not exist"))
+            })?;
+            target.upsert_point(*id, values.clone())?;
+            Ok(())
+        }
+        WalRecord::DeletePoint { collection, id } => {
+            let target = collections.get_mut(collection).ok_or_else(|| {
+                PersistenceError::InvalidData(format!("collection '{collection}' does not exist"))
+            })?;
+            target.remove_point(*id).ok_or_else(|| {
+                PersistenceError::InvalidData(format!(
+                    "point '{id}' does not exist in collection '{collection}'"
+                ))
+            })?;
+            Ok(())
+        }
+    }
+}
+
+fn load_snapshot(path: &Path) -> Result<BTreeMap<String, Collection>, PersistenceError> {
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+
+    let raw = fs::read_to_string(path)?;
+    let snapshot: SnapshotDocument = serde_json::from_str(&raw)?;
+
+    if snapshot.version != SNAPSHOT_VERSION {
+        return Err(PersistenceError::InvalidData(format!(
+            "unsupported snapshot version {}",
+            snapshot.version
+        )));
+    }
+
+    let mut collections = BTreeMap::new();
+    for entry in snapshot.collections {
+        if collections.contains_key(&entry.name) {
+            return Err(PersistenceError::InvalidData(format!(
+                "duplicate collection '{}' in snapshot",
+                entry.name
+            )));
+        }
+
+        let config = CollectionConfig::new(entry.dimension, entry.strict_finite)?;
+        let mut collection = Collection::new(entry.name.clone(), config)?;
+
+        for point in entry.points {
+            collection.upsert_point(point.id, point.values)?;
+        }
+
+        collections.insert(entry.name, collection);
+    }
+
+    Ok(collections)
+}
+
+fn write_snapshot(
+    path: &Path,
+    collections: &BTreeMap<String, Collection>,
+) -> Result<(), PersistenceError> {
+    ensure_parent_dir(path)?;
+
+    let snapshot = SnapshotDocument {
+        version: SNAPSHOT_VERSION,
+        collections: collections.values().map(snapshot_collection_from).collect(),
+    };
+
+    let temp_path = path.with_extension("tmp");
+    let bytes = serde_json::to_vec_pretty(&snapshot)?;
+    fs::write(&temp_path, bytes)?;
+    fs::rename(temp_path, path)?;
+    Ok(())
+}
+
+fn append_wal(path: &Path, record: &WalRecord) -> Result<(), PersistenceError> {
+    ensure_parent_dir(path)?;
+
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+    serde_json::to_writer(&mut file, record)?;
+    file.write_all(b"\n")?;
+    file.flush()?;
+    Ok(())
+}
+
+fn truncate_wal(path: &Path) -> Result<(), PersistenceError> {
+    ensure_parent_dir(path)?;
+    fs::write(path, b"")?;
+    Ok(())
+}
+
+fn replay_wal(
+    path: &Path,
+    collections: &mut BTreeMap<String, Collection>,
+) -> Result<(), PersistenceError> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let file = File::open(path)?;
+    for (index, line) in BufReader::new(file).lines().enumerate() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let record: WalRecord = serde_json::from_str(&line).map_err(|error| {
+            PersistenceError::InvalidData(format!("invalid wal line {}: {error}", index + 1))
+        })?;
+
+        apply_wal_record(collections, &record)?;
+    }
+
+    Ok(())
+}
+
+fn ensure_parent_dir(path: &Path) -> Result<(), PersistenceError> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    Ok(())
+}
+
+fn snapshot_collection_from(collection: &Collection) -> SnapshotCollection {
+    let points = collection
+        .point_ids()
+        .into_iter()
+        .filter_map(|id| {
+            collection.get_point(id).map(|values| SnapshotPoint {
+                id,
+                values: values.to_vec(),
+            })
+        })
+        .collect();
+
+    SnapshotCollection {
+        name: collection.name().to_string(),
+        dimension: collection.dimension(),
+        strict_finite: collection.strict_finite(),
+        points,
+    }
+}
+
+#[cfg(test)]
+mod tests;

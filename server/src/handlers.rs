@@ -2,19 +2,22 @@ use std::sync::atomic::Ordering;
 
 use aionbd_core::{
     cosine_similarity_with_options, dot_product_with_options, l2_distance_with_options, Collection,
-    CollectionConfig, VectorValidationOptions,
+    CollectionConfig, VectorValidationOptions, WalRecord,
 };
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::Json;
 
-use crate::config::AppConfig;
 use crate::errors::{map_collection_error, map_json_rejection, map_vector_error, ApiError};
+use crate::handler_utils::{
+    build_collection_response, canonical_collection_name, validate_distance_request,
+};
 use crate::models::{
     CollectionResponse, CreateCollectionRequest, DeletePointResponse, DistanceRequest,
     DistanceResponse, ListCollectionsResponse, LiveResponse, Metric, PointResponse, ReadyChecks,
     ReadyResponse, UpsertPointRequest, UpsertPointResponse,
 };
+use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 
 pub(crate) async fn live(State(state): State<AppState>) -> Json<LiveResponse> {
@@ -98,7 +101,19 @@ pub(crate) async fn create_collection(
     }
 
     let response = build_collection_response(&collection);
-    collections.insert(name, collection);
+    collections.insert(name.clone(), collection);
+    let snapshot = collections.clone();
+    drop(collections);
+
+    persist_change_if_enabled(
+        &state,
+        &snapshot,
+        &WalRecord::CreateCollection {
+            name,
+            dimension: payload.dimension,
+            strict_finite: payload.strict_finite,
+        },
+    )?;
 
     Ok(Json(response))
 }
@@ -153,9 +168,23 @@ pub(crate) async fn upsert_point(
         .get_mut(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
+    let values = payload.values;
     let created = collection
-        .upsert_point(id, payload.values)
+        .upsert_point(id, values.clone())
         .map_err(map_collection_error)?;
+
+    let snapshot = collections.clone();
+    drop(collections);
+
+    persist_change_if_enabled(
+        &state,
+        &snapshot,
+        &WalRecord::UpsertPoint {
+            collection: name,
+            id,
+            values,
+        },
+    )?;
 
     Ok(Json(UpsertPointResponse { id, created }))
 }
@@ -204,65 +233,17 @@ pub(crate) async fn delete_point(
         return Err(ApiError::not_found(format!("point '{id}' not found")));
     }
 
+    let snapshot = collections.clone();
+    drop(collections);
+
+    persist_change_if_enabled(
+        &state,
+        &snapshot,
+        &WalRecord::DeletePoint {
+            collection: name,
+            id,
+        },
+    )?;
+
     Ok(Json(DeletePointResponse { id, deleted: true }))
-}
-
-fn validate_distance_request(
-    payload: &DistanceRequest,
-    config: &AppConfig,
-) -> Result<(), ApiError> {
-    if payload.left.len() != payload.right.len() {
-        return Err(ApiError::invalid_argument(
-            "left and right must have the same length",
-        ));
-    }
-    if payload.left.is_empty() {
-        return Err(ApiError::invalid_argument("vectors must not be empty"));
-    }
-    if payload.left.len() > config.max_dimension {
-        return Err(ApiError::invalid_argument(format!(
-            "vector dimension {} exceeds configured maximum {}",
-            payload.left.len(),
-            config.max_dimension
-        )));
-    }
-
-    if config.strict_finite {
-        if let Some(index) = first_non_finite_index(&payload.left) {
-            return Err(ApiError::invalid_argument(format!(
-                "left contains a non-finite value at index {index}"
-            )));
-        }
-        if let Some(index) = first_non_finite_index(&payload.right) {
-            return Err(ApiError::invalid_argument(format!(
-                "right contains a non-finite value at index {index}"
-            )));
-        }
-    }
-
-    Ok(())
-}
-
-fn first_non_finite_index(values: &[f32]) -> Option<usize> {
-    values.iter().position(|value| !value.is_finite())
-}
-
-fn canonical_collection_name(name: &str) -> Result<String, ApiError> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Err(ApiError::invalid_argument(
-            "collection name must not be empty",
-        ));
-    }
-
-    Ok(trimmed.to_string())
-}
-
-fn build_collection_response(collection: &Collection) -> CollectionResponse {
-    CollectionResponse {
-        name: collection.name().to_string(),
-        dimension: collection.dimension(),
-        strict_finite: collection.strict_finite(),
-        point_count: collection.len(),
-    }
 }

@@ -30,6 +30,6 @@ mixing concerns too early.
 ## Next architecture steps
 
 1. Add collection abstraction in `core/`. (done: in-memory typed collection + validation)
-2. Add persistence layer (WAL + snapshot) design in `core/`.
+2. Add persistence layer (WAL + snapshot) design in `core/`. (done: basic WAL+snapshot with replay)
 3. Expand `server/` routes to CRUD collection/point operations. (done: in-memory CRUD endpoints)
 4. Add benchmark harness scenarios mapped to roadmap KPI.
