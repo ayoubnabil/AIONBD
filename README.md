@@ -30,7 +30,7 @@ cargo run --release -p aionbd-bench
 ```bash
 cd sdk/python
 python -m pip install -e .
-python -c "from aionbd import AionBDClient; print(AionBDClient().health())"
+python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 ```
 
 ## Notes

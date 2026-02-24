@@ -14,7 +14,14 @@ python -m pip install -e .
 from aionbd import AionBDClient
 
 client = AionBDClient("http://127.0.0.1:8080")
-print(client.health())
+print(client.live())
+print(client.ready())
 print(client.distance([1.0, 2.0], [2.0, 3.0], metric="dot"))
-```
 
+collection = client.create_collection("demo", dimension=3, strict_finite=True)
+print(collection)
+print(client.list_collections())
+print(client.upsert_point("demo", 1, [1.0, 2.0, 3.0]))
+print(client.get_point("demo", 1))
+print(client.delete_point("demo", 1))
+```

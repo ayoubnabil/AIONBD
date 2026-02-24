@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
@@ -25,6 +26,40 @@ class DistanceResult:
     value: float
 
 
+@dataclass(frozen=True)
+class CollectionInfo:
+    """Represents collection metadata returned by the server."""
+
+    name: str
+    dimension: int
+    strict_finite: bool
+    point_count: int
+
+
+@dataclass(frozen=True)
+class UpsertPointResult:
+    """Represents point upsert result."""
+
+    id: int
+    created: bool
+
+
+@dataclass(frozen=True)
+class PointResult:
+    """Represents a stored point payload."""
+
+    id: int
+    values: list[float]
+
+
+@dataclass(frozen=True)
+class DeletePointResult:
+    """Represents point delete result."""
+
+    id: int
+    deleted: bool
+
+
 class AionBDClient:
     """Small HTTP client targeting the AIONBD server skeleton."""
 
@@ -34,10 +69,19 @@ class AionBDClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
 
-    def health(self) -> dict[str, Any]:
-        """Returns server health and uptime metadata."""
-        payload = self._request("GET", "/health")
+    def live(self) -> dict[str, Any]:
+        """Returns liveness and uptime metadata."""
+        payload = self._request("GET", "/live")
         return payload if isinstance(payload, dict) else {"raw": payload}
+
+    def ready(self) -> dict[str, Any]:
+        """Returns readiness checks and uptime metadata."""
+        payload = self._request("GET", "/ready")
+        return payload if isinstance(payload, dict) else {"raw": payload}
+
+    def health(self) -> dict[str, Any]:
+        """Backward-compatible alias using readiness endpoint."""
+        return self.ready()
 
     def distance(
         self, left: list[float], right: list[float], metric: str = "dot"
@@ -58,6 +102,90 @@ class AionBDClient:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise AionBDError(f"invalid distance response: {payload}") from exc
+
+    def create_collection(
+        self, name: str, dimension: int, strict_finite: bool = True
+    ) -> CollectionInfo:
+        """Creates an in-memory collection."""
+        payload = self._request(
+            "POST",
+            "/collections",
+            {
+                "name": name,
+                "dimension": dimension,
+                "strict_finite": strict_finite,
+            },
+        )
+        return self._parse_collection(payload)
+
+    def list_collections(self) -> list[CollectionInfo]:
+        """Lists all collections."""
+        payload = self._request("GET", "/collections")
+        try:
+            items = payload["collections"]
+            return [self._parse_collection(item) for item in items]
+        except (KeyError, TypeError) as exc:
+            raise AionBDError(f"invalid list collections response: {payload}") from exc
+
+    def get_collection(self, name: str) -> CollectionInfo:
+        """Reads collection metadata."""
+        payload = self._request("GET", f"/collections/{self._escaped(name)}")
+        return self._parse_collection(payload)
+
+    def upsert_point(
+        self, collection: str, point_id: int, values: list[float]
+    ) -> UpsertPointResult:
+        """Creates or updates a point in a collection."""
+        payload = self._request(
+            "PUT",
+            f"/collections/{self._escaped(collection)}/points/{point_id}",
+            {"values": values},
+        )
+        try:
+            return UpsertPointResult(
+                id=int(payload["id"]), created=bool(payload["created"])
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid upsert response: {payload}") from exc
+
+    def get_point(self, collection: str, point_id: int) -> PointResult:
+        """Reads a point payload from a collection."""
+        payload = self._request(
+            "GET", f"/collections/{self._escaped(collection)}/points/{point_id}"
+        )
+        try:
+            values = payload["values"]
+            if not isinstance(values, list):
+                raise TypeError("values must be a list")
+            return PointResult(
+                id=int(payload["id"]),
+                values=[float(value) for value in values],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid get point response: {payload}") from exc
+
+    def delete_point(self, collection: str, point_id: int) -> DeletePointResult:
+        """Deletes a point from a collection."""
+        payload = self._request(
+            "DELETE", f"/collections/{self._escaped(collection)}/points/{point_id}"
+        )
+        try:
+            return DeletePointResult(
+                id=int(payload["id"]), deleted=bool(payload["deleted"])
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid delete point response: {payload}") from exc
+
+    def _parse_collection(self, payload: Any) -> CollectionInfo:
+        try:
+            return CollectionInfo(
+                name=str(payload["name"]),
+                dimension=int(payload["dimension"]),
+                strict_finite=bool(payload["strict_finite"]),
+                point_count=int(payload["point_count"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AionBDError(f"invalid collection response: {payload}") from exc
 
     def _request(
         self, method: str, path: str, body: dict[str, Any] | None = None
@@ -89,3 +217,7 @@ class AionBDClient:
             raise AionBDError(
                 f"request failed for {method} {path}: {exc.reason}"
             ) from exc
+
+    @staticmethod
+    def _escaped(value: str) -> str:
+        return urllib.parse.quote(value.strip(), safe="")
