@@ -48,6 +48,7 @@ AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
 - `AIONBD_REQUEST_TIMEOUT_MS` (default: `2000`)
 - `AIONBD_MAX_BODY_BYTES` (default: `1048576`)
 - `AIONBD_MAX_CONCURRENCY` (default: `256`)
+- `AIONBD_CHECKPOINT_INTERVAL` (default: `32`)
 - `AIONBD_PERSISTENCE_ENABLED` (default: `true`)
 - `AIONBD_SNAPSHOT_PATH` (default: `data/aionbd_snapshot.json`)
 - `AIONBD_WAL_PATH` (default: `data/aionbd_wal.jsonl`)

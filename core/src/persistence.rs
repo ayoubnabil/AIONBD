@@ -95,8 +95,19 @@ pub fn persist_change(
     collections: &BTreeMap<String, Collection>,
     record: &WalRecord,
 ) -> Result<PersistOutcome, PersistenceError> {
-    append_wal(wal_path, record)?;
+    append_wal_record(wal_path, record)?;
+    checkpoint_snapshot(snapshot_path, wal_path, collections)
+}
 
+pub fn append_wal_record(wal_path: &Path, record: &WalRecord) -> Result<(), PersistenceError> {
+    append_wal(wal_path, record)
+}
+
+pub fn checkpoint_snapshot(
+    snapshot_path: &Path,
+    wal_path: &Path,
+    collections: &BTreeMap<String, Collection>,
+) -> Result<PersistOutcome, PersistenceError> {
     match write_snapshot(snapshot_path, collections).and_then(|_| truncate_wal(wal_path)) {
         Ok(()) => Ok(PersistOutcome::Checkpointed),
         Err(error) => Ok(PersistOutcome::WalOnly {

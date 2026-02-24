@@ -48,6 +48,7 @@ fn test_state(snapshot_path: PathBuf, wal_path: PathBuf) -> AppState {
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
         max_concurrency: 256,
+        checkpoint_interval: 1,
         persistence_enabled: true,
         snapshot_path,
         wal_path,

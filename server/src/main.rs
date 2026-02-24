@@ -73,6 +73,7 @@ async fn main() -> Result<()> {
         timeout_ms = config.request_timeout_ms,
         max_body_bytes = config.max_body_bytes,
         max_concurrency = config.max_concurrency,
+        checkpoint_interval = config.checkpoint_interval,
         persistence_enabled = config.persistence_enabled,
         snapshot_path = %config.snapshot_path.display(),
         wal_path = %config.wal_path.display(),

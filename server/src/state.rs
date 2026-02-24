@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
@@ -13,6 +13,7 @@ pub(crate) struct AppState {
     pub(crate) config: Arc<AppConfig>,
     pub(crate) engine_loaded: Arc<AtomicBool>,
     pub(crate) storage_available: Arc<AtomicBool>,
+    pub(crate) persistence_writes: Arc<AtomicU64>,
     pub(crate) collections: Arc<RwLock<BTreeMap<String, Collection>>>,
 }
 
@@ -23,6 +24,7 @@ impl Clone for AppState {
             config: Arc::clone(&self.config),
             engine_loaded: Arc::clone(&self.engine_loaded),
             storage_available: Arc::clone(&self.storage_available),
+            persistence_writes: Arc::clone(&self.persistence_writes),
             collections: Arc::clone(&self.collections),
         }
     }
@@ -38,6 +40,7 @@ impl AppState {
             config: Arc::new(config),
             engine_loaded: Arc::new(AtomicBool::new(true)),
             storage_available: Arc::new(AtomicBool::new(true)),
+            persistence_writes: Arc::new(AtomicU64::new(0)),
             collections: Arc::new(RwLock::new(collections)),
         }
     }

@@ -12,6 +12,7 @@ pub(crate) struct AppConfig {
     pub(crate) request_timeout_ms: u64,
     pub(crate) max_body_bytes: usize,
     pub(crate) max_concurrency: usize,
+    pub(crate) checkpoint_interval: usize,
     pub(crate) persistence_enabled: bool,
     pub(crate) snapshot_path: PathBuf,
     pub(crate) wal_path: PathBuf,
@@ -25,6 +26,7 @@ impl AppConfig {
         let request_timeout_ms = parse_u64("AIONBD_REQUEST_TIMEOUT_MS", 2000)?;
         let max_body_bytes = parse_usize("AIONBD_MAX_BODY_BYTES", 1_048_576)?;
         let max_concurrency = parse_usize("AIONBD_MAX_CONCURRENCY", 256)?;
+        let checkpoint_interval = parse_usize("AIONBD_CHECKPOINT_INTERVAL", 32)?;
         let persistence_enabled = parse_bool("AIONBD_PERSISTENCE_ENABLED", true)?;
         let snapshot_path = parse_path("AIONBD_SNAPSHOT_PATH", "data/aionbd_snapshot.json")?;
         let wal_path = parse_path("AIONBD_WAL_PATH", "data/aionbd_wal.jsonl")?;
@@ -38,6 +40,9 @@ impl AppConfig {
         if max_concurrency == 0 {
             anyhow::bail!("AIONBD_MAX_CONCURRENCY must be > 0");
         }
+        if checkpoint_interval == 0 {
+            anyhow::bail!("AIONBD_CHECKPOINT_INTERVAL must be > 0");
+        }
 
         Ok(Self {
             bind,
@@ -46,6 +51,7 @@ impl AppConfig {
             request_timeout_ms,
             max_body_bytes,
             max_concurrency,
+            checkpoint_interval,
             persistence_enabled,
             snapshot_path,
             wal_path,

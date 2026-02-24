@@ -38,6 +38,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - `ROADMAP_EDGEVECTOR.md` is ignored intentionally in git.
 - This step focuses on project structure and baseline quality.
 - Contribution flow is branch-first local with mandatory expert review before merge (`CONTRIBUTING.md`).
+- Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`).
 - Server endpoints:
   - `GET /live`
   - `GET /ready`

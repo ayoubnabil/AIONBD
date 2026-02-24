@@ -10,7 +10,8 @@ pub mod vector;
 
 pub use collection::{Collection, CollectionConfig, CollectionError, PointId};
 pub use persistence::{
-    load_collections, persist_change, PersistOutcome, PersistenceError, WalRecord,
+    append_wal_record, checkpoint_snapshot, load_collections, persist_change, PersistOutcome,
+    PersistenceError, WalRecord,
 };
 pub use vector::{
     cosine_similarity, cosine_similarity_with_options, dot_product, dot_product_with_options,
