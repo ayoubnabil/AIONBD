@@ -6,8 +6,7 @@ use tokio::task;
 use crate::auth::TenantContext;
 use crate::errors::ApiError;
 use crate::handler_utils::{
-    collection_handle, collection_handle_by_name, existing_collection_write_lock,
-    scoped_collection_name,
+    collection_handle, existing_collection_write_lock, scoped_collection_name,
 };
 use crate::index_manager::remove_l2_index_entry;
 use crate::models::{
@@ -17,7 +16,7 @@ use crate::models::{
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 use crate::tenant_quota::acquire_tenant_quota_guard;
-use crate::write_path::{apply_delete, ensure_point_exists};
+use crate::write_path::{apply_delete, ensure_point_exists, load_collection_handle};
 
 const MAX_OFFSET_SCAN: usize = 100_000;
 
@@ -136,7 +135,7 @@ pub(crate) async fn delete_point(
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
-    let handle = collection_handle_by_name(&state, &name)?;
+    let handle = load_collection_handle(state.clone(), name.clone()).await?;
 
     ensure_point_exists(handle.clone(), id).await?;
 

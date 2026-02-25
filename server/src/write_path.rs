@@ -3,7 +3,7 @@ use tokio::task;
 use crate::errors::ApiError;
 use crate::handler_utils::validate_upsert_input;
 use crate::models::PointPayload;
-use crate::state::CollectionHandle;
+use crate::state::{AppState, CollectionHandle};
 
 pub(crate) struct UpsertPrecheck {
     pub(crate) creating_point: bool,
@@ -46,6 +46,68 @@ pub(crate) async fn apply_upsert(
             .map_err(|_| ApiError::internal("collection lock poisoned"))?
             .upsert_point_with_payload(id, values, payload)
             .map_err(|error| ApiError::invalid_argument(error.to_string()))
+    })
+    .await
+}
+
+pub(crate) async fn load_collection_handle(
+    state: AppState,
+    canonical_name: String,
+) -> Result<CollectionHandle, ApiError> {
+    run(move || {
+        let collections = state
+            .collections
+            .read()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        collections
+            .get(&canonical_name)
+            .cloned()
+            .ok_or_else(|| ApiError::not_found(format!("collection '{canonical_name}' not found")))
+    })
+    .await
+}
+
+pub(crate) async fn collection_exists(
+    state: AppState,
+    canonical_name: String,
+) -> Result<bool, ApiError> {
+    run(move || {
+        let collections = state
+            .collections
+            .read()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        Ok(collections.contains_key(&canonical_name))
+    })
+    .await
+}
+
+pub(crate) async fn insert_collection(
+    state: AppState,
+    canonical_name: String,
+    handle: CollectionHandle,
+) -> Result<(), ApiError> {
+    run(move || {
+        let mut collections = state
+            .collections
+            .write()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        collections.insert(canonical_name, handle);
+        Ok(())
+    })
+    .await
+}
+
+pub(crate) async fn remove_collection(
+    state: AppState,
+    canonical_name: String,
+) -> Result<(), ApiError> {
+    run(move || {
+        let mut collections = state
+            .collections
+            .write()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        let _ = collections.remove(&canonical_name);
+        Ok(())
     })
     .await
 }

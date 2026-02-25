@@ -7,9 +7,9 @@ use tokio::task;
 use crate::auth::TenantContext;
 use crate::errors::{map_collection_error, map_json_rejection, ApiError};
 use crate::handler_utils::{
-    build_collection_response, canonical_collection_name, collection_handle,
-    collection_handle_by_name, collection_write_lock, existing_collection_write_lock,
-    remove_collection_write_lock, scoped_collection_name, visible_collection_name,
+    build_collection_response, canonical_collection_name, collection_handle, collection_write_lock,
+    existing_collection_write_lock, remove_collection_write_lock, scoped_collection_name,
+    visible_collection_name,
 };
 pub(crate) use crate::handlers_health::{distance, live, ready};
 use crate::index_manager::remove_l2_index_entry;
@@ -22,7 +22,10 @@ use crate::state::AppState;
 use crate::tenant_quota::{
     acquire_tenant_quota_guard, tenant_collection_count, tenant_point_count,
 };
-use crate::write_path::{apply_upsert, precheck_upsert};
+use crate::write_path::{
+    apply_upsert, collection_exists, insert_collection, load_collection_handle, precheck_upsert,
+    remove_collection,
+};
 
 const HARD_MAX_POINTS_PER_COLLECTION: usize = 1_000_000;
 
@@ -51,20 +54,13 @@ pub(crate) async fn create_collection(
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
 
-    {
-        let collections = state
-            .collections
-            .read()
-            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-
-        if collections.contains_key(&name) {
-            return Err(ApiError::conflict(format!(
-                "collection '{name}' already exists"
-            )));
-        }
+    if collection_exists(state.clone(), name.clone()).await? {
+        return Err(ApiError::conflict(format!(
+            "collection '{name}' already exists"
+        )));
     }
     if state.auth_config.tenant_max_collections > 0 {
-        let tenant_collections = tenant_collection_count(&state, &tenant)?;
+        let tenant_collections = tenant_collection_count(state.clone(), tenant.clone()).await?;
         if tenant_collections >= state.auth_config.tenant_max_collections as usize {
             let _ = state
                 .metrics
@@ -94,16 +90,15 @@ pub(crate) async fn create_collection(
         return Err(error);
     }
 
-    {
-        let mut collections = state.collections.write().map_err(|_| {
+    insert_collection(state.clone(), name.clone(), handle)
+        .await
+        .map_err(|_| {
             state
                 .engine_loaded
                 .store(false, std::sync::atomic::Ordering::Relaxed);
             let _ = remove_collection_write_lock(&state, &name);
             ApiError::internal("in-memory state update failed after wal append; restart required")
         })?;
-        collections.insert(name, handle);
-    }
 
     Ok(Json(CollectionResponse {
         name: response_name,
@@ -181,28 +176,21 @@ pub(crate) async fn delete_collection(
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
 
-    {
-        let collections = state
-            .collections
-            .read()
-            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-        if !collections.contains_key(&name) {
-            return Err(ApiError::not_found(format!(
-                "collection '{name}' not found"
-            )));
-        }
+    if !collection_exists(state.clone(), name.clone()).await? {
+        return Err(ApiError::not_found(format!(
+            "collection '{name}' not found"
+        )));
     }
 
     persist_change_if_enabled(&state, &WalRecord::DeleteCollection { name: name.clone() }).await?;
-    {
-        let mut collections = state.collections.write().map_err(|_| {
+    remove_collection(state.clone(), name.clone())
+        .await
+        .map_err(|_| {
             state
                 .engine_loaded
                 .store(false, std::sync::atomic::Ordering::Relaxed);
             ApiError::internal("in-memory state update failed after wal append; restart required")
         })?;
-        let _ = collections.remove(&name);
-    }
     drop(collection_guard);
     let _ = remove_collection_write_lock(&state, &name);
 
@@ -225,7 +213,7 @@ pub(crate) async fn upsert_point(
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
-    let handle = collection_handle_by_name(&state, &name)?;
+    let handle = load_collection_handle(state.clone(), name.clone()).await?;
 
     let values = payload.values;
     let payload_values = payload.payload;
@@ -239,7 +227,7 @@ pub(crate) async fn upsert_point(
         )));
     }
     if precheck.creating_point && state.auth_config.tenant_max_points > 0 {
-        let tenant_points = tenant_point_count(&state, &tenant)?;
+        let tenant_points = tenant_point_count(state.clone(), tenant.clone()).await?;
         if tenant_points >= state.auth_config.tenant_max_points as usize {
             let _ = state
                 .metrics

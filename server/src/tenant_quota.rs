@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::task;
 
 use crate::auth::TenantContext;
 use crate::errors::ApiError;
@@ -30,7 +31,25 @@ pub(crate) async fn acquire_tenant_quota_guard(
         .map_err(|_| ApiError::internal("tenant quota semaphore closed"))
 }
 
-pub(crate) fn tenant_collection_count(
+pub(crate) async fn tenant_collection_count(
+    state: AppState,
+    tenant: TenantContext,
+) -> Result<usize, ApiError> {
+    task::spawn_blocking(move || tenant_collection_count_blocking(&state, &tenant))
+        .await
+        .map_err(|_| ApiError::internal("tenant collection counting worker task failed"))?
+}
+
+pub(crate) async fn tenant_point_count(
+    state: AppState,
+    tenant: TenantContext,
+) -> Result<usize, ApiError> {
+    task::spawn_blocking(move || tenant_point_count_blocking(&state, &tenant))
+        .await
+        .map_err(|_| ApiError::internal("tenant point counting worker task failed"))?
+}
+
+fn tenant_collection_count_blocking(
     state: &AppState,
     tenant: &TenantContext,
 ) -> Result<usize, ApiError> {
@@ -47,7 +66,7 @@ pub(crate) fn tenant_collection_count(
     Ok(count)
 }
 
-pub(crate) fn tenant_point_count(
+fn tenant_point_count_blocking(
     state: &AppState,
     tenant: &TenantContext,
 ) -> Result<usize, ApiError> {
