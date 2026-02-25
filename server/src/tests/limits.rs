@@ -11,6 +11,27 @@ fn test_state(max_page_limit: usize, max_topk_limit: usize) -> AppState {
     test_state_with_max_dimension(8, max_page_limit, max_topk_limit)
 }
 
+fn test_state_with_max_points(max_points_per_collection: usize) -> AppState {
+    let config = AppConfig {
+        bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
+        max_dimension: 8,
+        max_points_per_collection,
+        strict_finite: true,
+        request_timeout_ms: 2_000,
+        max_body_bytes: 1_048_576,
+        max_concurrency: 256,
+        max_page_limit: 1_000,
+        max_topk_limit: 1_000,
+        checkpoint_interval: 1,
+        persistence_enabled: false,
+        wal_sync_on_write: true,
+        snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
+        wal_path: std::path::PathBuf::from("unused_wal.jsonl"),
+    };
+
+    AppState::with_collections(config, std::collections::BTreeMap::new())
+}
+
 fn test_state_with_max_dimension(
     max_dimension: usize,
     max_page_limit: usize,
@@ -54,6 +75,52 @@ async fn create_collection_rejects_dimension_above_configured_maximum() {
         .expect("response should be available");
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn upsert_rejects_new_point_when_collection_cap_is_reached() {
+    let app = build_app(test_state_with_max_points(1));
+
+    let create_req = Request::builder()
+        .method("POST")
+        .uri("/collections")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"name": "cap_demo", "dimension": 2}).to_string(),
+        ))
+        .expect("request must build");
+    let create_resp = app
+        .clone()
+        .oneshot(create_req)
+        .await
+        .expect("response expected");
+    assert_eq!(create_resp.status(), StatusCode::OK);
+
+    let first_upsert = Request::builder()
+        .method("PUT")
+        .uri("/collections/cap_demo/points/1")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({"values": [1.0, 0.0]}).to_string()))
+        .expect("request must build");
+    let first_resp = app
+        .clone()
+        .oneshot(first_upsert)
+        .await
+        .expect("response expected");
+    assert_eq!(first_resp.status(), StatusCode::OK);
+
+    let second_upsert = Request::builder()
+        .method("PUT")
+        .uri("/collections/cap_demo/points/2")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({"values": [2.0, 0.0]}).to_string()))
+        .expect("request must build");
+    let second_resp = app
+        .clone()
+        .oneshot(second_upsert)
+        .await
+        .expect("response expected");
+    assert_eq!(second_resp.status(), StatusCode::TOO_MANY_REQUESTS);
 }
 
 #[tokio::test]
