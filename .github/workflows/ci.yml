@@ -23,3 +23,24 @@ jobs:
         run: ./scripts/verify_local.sh
       - name: Chaos persistence verification
         run: ./scripts/verify_chaos.sh
+
+  bench-search-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Search quality benchmark pipeline
+        run: ./scripts/verify_bench.sh
+      - name: Upload search quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-quality-report
+          path: |
+            bench/reports/search_quality_report.md
+            bench/reports/search_quality_report.json
