@@ -29,3 +29,8 @@ print(client.get_point("demo", 1))
 print(client.delete_point("demo", 1))
 print(client.delete_collection("demo"))
 ```
+
+## Compatibility note
+
+- `aionbd-sdk` `0.2.0` contains a breaking change:
+- `list_points(...)` now returns `{"points": [...], "total": int, "next_offset": int|None}` instead of only a list of IDs.
