@@ -36,6 +36,7 @@ run_ops_checks() {
   python3 scripts/check_backup_restore_smoke.py
   python3 scripts/check_collection_export_import_smoke.py
   python3 scripts/check_chaos_pipeline_smoke.py
+  python3 scripts/check_refresh_report_baselines_smoke.py
   python3 scripts/check_report_regressions_smoke.py
   python3 scripts/check_soak_harness_smoke.py
   python3 scripts/check_soak_pipeline_smoke.py
@@ -95,7 +96,7 @@ for file in "${!changed_map[@]}"; do
     sdk/python/*)
       python_changed=1
       ;;
-    docs/*|ops/*|scripts/check_file_sizes.sh|scripts/check_alert_runbook_sync.py|scripts/check_backup_restore_smoke.py|scripts/check_collection_export_import_smoke.py|scripts/check_chaos_pipeline_smoke.py|scripts/check_report_regressions_smoke.py|scripts/check_soak_harness_smoke.py|scripts/check_soak_pipeline_smoke.py|scripts/state_backup_restore.py|scripts/collection_export_import.py|scripts/compare_report_regressions.py|scripts/run_chaos_pipeline.py|scripts/run_soak_test.py|scripts/run_soak_pipeline.py|scripts/verify_chaos.sh|scripts/verify_soak.sh|scripts/verify_local.sh)
+    docs/*|ops/*|scripts/check_file_sizes.sh|scripts/check_alert_runbook_sync.py|scripts/check_backup_restore_smoke.py|scripts/check_collection_export_import_smoke.py|scripts/check_chaos_pipeline_smoke.py|scripts/check_refresh_report_baselines_smoke.py|scripts/check_report_regressions_smoke.py|scripts/check_soak_harness_smoke.py|scripts/check_soak_pipeline_smoke.py|scripts/state_backup_restore.py|scripts/collection_export_import.py|scripts/compare_report_regressions.py|scripts/refresh_report_baselines.py|scripts/run_chaos_pipeline.py|scripts/run_soak_test.py|scripts/run_soak_pipeline.py|scripts/verify_chaos.sh|scripts/verify_soak.sh|scripts/verify_local.sh)
       ops_changed=1
       ;;
   esac

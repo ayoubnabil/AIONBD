@@ -96,3 +96,4 @@ Before changing soak thresholds or profile definitions:
 2. Compare with last accepted baseline run.
 3. Update `ops/soak/longrun_profiles.json` when profile contracts change.
 4. Ensure dry-run smoke still passes in CI.
+5. If dry-run outputs changed intentionally, refresh baselines via `docs/baseline_refresh_runbook.md`.

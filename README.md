@@ -65,6 +65,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Soak execution runbook is available at `docs/soak_runbook.md`.
 - Chaos pipeline reporting is available via `scripts/run_chaos_pipeline.py` (wrapper: `scripts/verify_chaos.sh`).
 - Report regression baselines are versioned in `ops/baselines/` and validated with `scripts/compare_report_regressions.py`.
+- Baseline refresh procedure is documented in `docs/baseline_refresh_runbook.md`.
 - Optional TLS termination is supported in-process via rustls (`AIONBD_TLS_ENABLED=true` with cert/key paths).
 - Production guides are available in `docs/production_sizing.md`, `docs/performance_tuning.md`, and `docs/security_notes.md`.
 - IVF async rebuild cooldown is configurable (`AIONBD_L2_INDEX_BUILD_COOLDOWN_MS`, default `1000`).
