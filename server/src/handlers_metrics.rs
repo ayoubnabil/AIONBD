@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::Ordering;
 
 use aionbd_core::incremental_snapshot_dir;
@@ -71,6 +72,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
     let storage_available = state.storage_available.load(Ordering::Relaxed);
     let (
         persistence_wal_size_bytes,
+        persistence_wal_tail_open,
         persistence_incremental_segments,
         persistence_incremental_size_bytes,
     ) = persistence_backlog(state);
@@ -152,6 +154,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .persistence_checkpoint_error_total
             .load(Ordering::Relaxed),
         persistence_wal_size_bytes,
+        persistence_wal_tail_open,
         persistence_incremental_segments,
         persistence_incremental_size_bytes,
         search_queries_total: state.metrics.search_queries_total.load(Ordering::Relaxed),
@@ -183,14 +186,15 @@ fn stable_http_duration_totals(state: &AppState) -> (u64, u64) {
     fallback
 }
 
-fn persistence_backlog(state: &AppState) -> (u64, u64, u64) {
+fn persistence_backlog(state: &AppState) -> (u64, bool, u64, u64) {
     if !state.config.persistence_enabled {
-        return (0, 0, 0);
+        return (0, false, 0, 0);
     }
 
     let wal_size_bytes = fs::metadata(&state.config.wal_path)
         .map(|metadata| metadata.len())
         .unwrap_or(0);
+    let wal_tail_open = wal_tail_is_open(&state.config.wal_path, wal_size_bytes);
     let incremental_dir = incremental_snapshot_dir(&state.config.snapshot_path);
     let mut incremental_segments = 0u64;
     let mut incremental_size_bytes = 0u64;
@@ -211,5 +215,27 @@ fn persistence_backlog(state: &AppState) -> (u64, u64, u64) {
         }
     }
 
-    (wal_size_bytes, incremental_segments, incremental_size_bytes)
+    (
+        wal_size_bytes,
+        wal_tail_open,
+        incremental_segments,
+        incremental_size_bytes,
+    )
+}
+
+fn wal_tail_is_open(path: &std::path::Path, wal_size_bytes: u64) -> bool {
+    if wal_size_bytes == 0 {
+        return false;
+    }
+    let Ok(mut file) = fs::File::open(path) else {
+        return false;
+    };
+    if file.seek(SeekFrom::End(-1)).is_err() {
+        return false;
+    }
+    let mut last = [0u8; 1];
+    if file.read_exact(&mut last).is_err() {
+        return false;
+    }
+    last[0] != b'\n'
 }

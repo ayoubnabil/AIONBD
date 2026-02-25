@@ -51,6 +51,15 @@ groups:
           summary: "AIONBD checkpoint attempts are failing"
           description: "Checkpoint worker reported internal errors; inspect persistence and runtime health."
 
+      - alert: AionbdWalTailOpen
+        expr: aionbd_persistence_enabled == 1 and aionbd_persistence_wal_tail_open == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL tail looks truncated"
+          description: "WAL file does not end with a newline for a sustained period; inspect storage health and restart behavior."
+
       - alert: AionbdWalBacklogGrowing
         expr: |
           aionbd_persistence_enabled == 1

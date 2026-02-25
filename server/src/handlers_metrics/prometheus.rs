@@ -104,6 +104,9 @@ aionbd_persistence_checkpoint_error_total {}\n\
 # HELP aionbd_persistence_wal_size_bytes Current WAL file size in bytes.\n\
 # TYPE aionbd_persistence_wal_size_bytes gauge\n\
 aionbd_persistence_wal_size_bytes {}\n\
+# HELP aionbd_persistence_wal_tail_open WAL tail truncation signal (1 when WAL does not end with a newline).\n\
+# TYPE aionbd_persistence_wal_tail_open gauge\n\
+aionbd_persistence_wal_tail_open {}\n\
 # HELP aionbd_persistence_incremental_segments Current number of incremental snapshot segment files.\n\
 # TYPE aionbd_persistence_incremental_segments gauge\n\
 aionbd_persistence_incremental_segments {}\n\
@@ -153,6 +156,7 @@ aionbd_search_ivf_fallback_exact_total {}\n",
         metrics.persistence_checkpoint_success_total,
         metrics.persistence_checkpoint_error_total,
         metrics.persistence_wal_size_bytes,
+        bool_as_u8(metrics.persistence_wal_tail_open),
         metrics.persistence_incremental_segments,
         metrics.persistence_incremental_size_bytes,
         metrics.search_queries_total,

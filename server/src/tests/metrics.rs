@@ -128,6 +128,7 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_writes"], 0);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
+    assert_eq!(payload["persistence_wal_tail_open"], false);
     assert_eq!(payload["persistence_incremental_segments"], 0);
     assert_eq!(payload["persistence_incremental_size_bytes"], 0);
     assert_eq!(payload["auth_failures_total"], 0);
@@ -247,6 +248,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["audit_events_total"], 13);
     assert_eq!(payload["persistence_writes"], 9);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
+    assert_eq!(payload["persistence_wal_tail_open"], false);
     assert_eq!(payload["persistence_incremental_segments"], 0);
     assert_eq!(payload["persistence_incremental_size_bytes"], 0);
     assert_eq!(payload["search_queries_total"], 21);
@@ -290,6 +292,7 @@ async fn metrics_report_persistence_backlog_sizes() {
         .expect("body should be readable");
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("valid json response");
     assert_eq!(payload["persistence_wal_size_bytes"], 5);
+    assert_eq!(payload["persistence_wal_tail_open"], true);
     assert_eq!(payload["persistence_incremental_segments"], 2);
     assert_eq!(payload["persistence_incremental_size_bytes"], 5);
 

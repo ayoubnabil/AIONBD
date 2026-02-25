@@ -119,6 +119,11 @@
           "expr": "rate(aionbd_persistence_checkpoint_error_total[5m])",
           "legendFormat": "checkpoint_error/s",
           "refId": "G"
+        },
+        {
+          "expr": "aionbd_persistence_wal_tail_open",
+          "legendFormat": "wal_tail_open",
+          "refId": "H"
         }
       ]
     },

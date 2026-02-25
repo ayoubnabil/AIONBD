@@ -53,6 +53,7 @@ Create one dashboard with these panels:
    `rate(aionbd_persistence_checkpoint_success_total[5m])`
    `rate(aionbd_persistence_checkpoint_error_total[5m])`
    `aionbd_persistence_wal_size_bytes`
+   `aionbd_persistence_wal_tail_open`
    `aionbd_persistence_incremental_segments`
    `aionbd_persistence_incremental_size_bytes`
 7. Index cache quality:
@@ -116,6 +117,15 @@ groups:
         annotations:
           summary: "AIONBD checkpoint attempts are failing"
           description: "Checkpoint worker reported internal errors; inspect persistence and runtime health."
+
+      - alert: AionbdWalTailOpen
+        expr: aionbd_persistence_enabled == 1 and aionbd_persistence_wal_tail_open == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL tail looks truncated"
+          description: "WAL file does not end with a newline for a sustained period; inspect storage health and restart behavior."
 
       - alert: AionbdWalBacklogGrowing
         expr: |
@@ -206,6 +216,11 @@ When `AionbdCheckpointError` fires:
 1. Inspect server logs around checkpoint worker failures.
 2. Correlate with runtime saturation and `aionbd_storage_available`.
 3. Treat sustained errors as a persistence incident and reduce write pressure.
+
+When `AionbdWalTailOpen` fires:
+1. Check `aionbd_persistence_wal_tail_open` together with `aionbd_persistence_wal_size_bytes`.
+2. Correlate with recent crashes/restarts and disk errors.
+3. If signal persists, plan controlled restart and inspect WAL replay behavior.
 
 When `AionbdWalBacklogGrowing` or `AionbdIncrementalBacklogGrowing` fires:
 1. Check `aionbd_persistence_wal_size_bytes`, `aionbd_persistence_incremental_segments`, and `aionbd_persistence_incremental_size_bytes`.
