@@ -96,6 +96,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) persistence_enabled: bool,
     pub(crate) persistence_wal_sync_on_write: bool,
     pub(crate) persistence_writes: u64,
+    pub(crate) persistence_checkpoint_in_flight: bool,
     pub(crate) persistence_checkpoint_degraded_total: u64,
     pub(crate) persistence_checkpoint_success_total: u64,
     pub(crate) persistence_checkpoint_error_total: u64,

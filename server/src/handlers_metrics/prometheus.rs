@@ -110,6 +110,9 @@ aionbd_persistence_wal_sync_on_write {}\n\
 # HELP aionbd_persistence_writes Successful persisted writes since startup.\n\
 # TYPE aionbd_persistence_writes counter\n\
 aionbd_persistence_writes {}\n\
+# HELP aionbd_persistence_checkpoint_in_flight Persistence checkpoint scheduler flag (1 running, 0 idle).\n\
+# TYPE aionbd_persistence_checkpoint_in_flight gauge\n\
+aionbd_persistence_checkpoint_in_flight {}\n\
 # HELP aionbd_persistence_checkpoint_degraded_total Total checkpoints that fell back to WAL-only mode.\n\
 # TYPE aionbd_persistence_checkpoint_degraded_total counter\n\
 aionbd_persistence_checkpoint_degraded_total {}\n\
@@ -179,6 +182,7 @@ aionbd_max_points_per_collection {}\n",
         bool_as_u8(metrics.persistence_enabled),
         bool_as_u8(metrics.persistence_wal_sync_on_write),
         metrics.persistence_writes,
+        bool_as_u8(metrics.persistence_checkpoint_in_flight),
         metrics.persistence_checkpoint_degraded_total,
         metrics.persistence_checkpoint_success_total,
         metrics.persistence_checkpoint_error_total,

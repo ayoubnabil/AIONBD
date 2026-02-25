@@ -155,6 +155,9 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
         persistence_enabled: state.config.persistence_enabled,
         persistence_wal_sync_on_write: state.config.wal_sync_on_write,
         persistence_writes: state.metrics.persistence_writes.load(Ordering::Relaxed),
+        persistence_checkpoint_in_flight: state
+            .persistence_checkpoint_in_flight
+            .load(Ordering::Relaxed),
         persistence_checkpoint_degraded_total: state
             .metrics
             .persistence_checkpoint_degraded_total

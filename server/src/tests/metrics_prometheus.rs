@@ -106,6 +106,7 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_persistence_enabled 0"));
     assert!(payload.contains("aionbd_persistence_wal_sync_on_write 1"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
+    assert!(payload.contains("aionbd_persistence_checkpoint_in_flight 0"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
     assert!(payload.contains("aionbd_persistence_incremental_segments 0"));
@@ -172,6 +173,9 @@ async fn metrics_prometheus_reflects_runtime_flags() {
         .metrics
         .persistence_writes
         .store(12, Ordering::Relaxed);
+    state
+        .persistence_checkpoint_in_flight
+        .store(true, Ordering::Relaxed);
     let app = build_app(state);
 
     let metrics_req = Request::builder()
@@ -201,6 +205,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_storage_available 0"));
     assert!(payload.contains("aionbd_persistence_wal_sync_on_write 0"));
     assert!(payload.contains("aionbd_persistence_writes 12"));
+    assert!(payload.contains("aionbd_persistence_checkpoint_in_flight 1"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
     assert!(payload.contains("aionbd_persistence_incremental_segments 0"));

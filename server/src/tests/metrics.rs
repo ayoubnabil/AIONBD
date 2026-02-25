@@ -109,6 +109,7 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
     assert_eq!(payload["persistence_writes"], 0);
+    assert_eq!(payload["persistence_checkpoint_in_flight"], false);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);
     assert_eq!(payload["persistence_incremental_segments"], 0);
@@ -174,6 +175,9 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
         .store(13, Ordering::Relaxed);
     state.metrics.persistence_writes.store(9, Ordering::Relaxed);
     state
+        .persistence_checkpoint_in_flight
+        .store(true, Ordering::Relaxed);
+    state
         .metrics
         .search_queries_total
         .store(21, Ordering::Relaxed);
@@ -230,6 +234,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["rate_limit_rejections_total"], 12);
     assert_eq!(payload["audit_events_total"], 13);
     assert_eq!(payload["persistence_writes"], 9);
+    assert_eq!(payload["persistence_checkpoint_in_flight"], true);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);

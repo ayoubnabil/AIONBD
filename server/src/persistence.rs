@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use aionbd_core::{
     append_wal_record_with_sync, checkpoint_wal_with_policy, CheckpointPolicy, PersistOutcome,
@@ -12,6 +13,7 @@ use crate::index_manager::{clear_l2_build_tracking, remove_l2_index_entry};
 use crate::state::AppState;
 
 const CHECKPOINT_COMPACT_AFTER: usize = 64;
+const ASYNC_CHECKPOINTS_DEFAULT: bool = false;
 
 pub(crate) async fn persist_change_if_enabled(
     state: &AppState,
@@ -41,53 +43,14 @@ pub(crate) async fn persist_change_if_enabled(
         .persistence_writes
         .fetch_add(1, Ordering::Relaxed)
         + 1;
-    if !is_checkpoint_due(writes_since_start, state.config.checkpoint_interval) {
-        return Ok(());
-    }
-
-    let snapshot_path = state.config.snapshot_path.clone();
-    let wal_path = state.config.wal_path.clone();
-    let checkpoint_policy = CheckpointPolicy {
-        incremental_compact_after: CHECKPOINT_COMPACT_AFTER,
-    };
-    match run_serialized_persistence_io(state, move || {
-        checkpoint_wal_with_policy(&snapshot_path, &wal_path, checkpoint_policy)
-            .map(|_| PersistOutcome::Checkpointed)
-            .or_else(|error| {
-                Ok(PersistOutcome::WalOnly {
-                    reason: error.to_string(),
-                })
-            })
-    })
-    .await
-    {
-        Ok(PersistOutcome::Checkpointed) => {
-            state.storage_available.store(true, Ordering::Relaxed);
-            let _ = state
-                .metrics
-                .persistence_checkpoint_success_total
-                .fetch_add(1, Ordering::Relaxed);
-            Ok(())
-        }
-        Ok(PersistOutcome::WalOnly { reason }) => {
-            state.storage_available.store(false, Ordering::Relaxed);
-            let _ = state
-                .metrics
-                .persistence_checkpoint_degraded_total
-                .fetch_add(1, Ordering::Relaxed);
-            tracing::warn!(%reason, "snapshot checkpoint skipped, relying on wal replay");
-            Ok(())
-        }
-        Err(error) => {
-            state.storage_available.store(false, Ordering::Relaxed);
-            let _ = state
-                .metrics
-                .persistence_checkpoint_error_total
-                .fetch_add(1, Ordering::Relaxed);
-            tracing::error!(%error, "failed to persist state");
-            Err(ApiError::internal("failed to persist state"))
+    if is_checkpoint_due(writes_since_start, state.config.checkpoint_interval) {
+        if configured_async_checkpoints() {
+            schedule_checkpoint_if_needed(state);
+        } else {
+            run_checkpoint(state.clone()).await;
         }
     }
+    Ok(())
 }
 
 async fn run_serialized_persistence_io<T>(
@@ -114,6 +77,88 @@ fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {
         }
         WalRecord::UpsertPoint { collection, .. } | WalRecord::DeletePoint { collection, .. } => {
             remove_l2_index_entry(state, collection);
+        }
+    }
+}
+
+fn schedule_checkpoint_if_needed(state: &AppState) {
+    if state
+        .persistence_checkpoint_in_flight
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return;
+    }
+
+    let state = state.clone();
+    tokio::spawn(async move {
+        run_checkpoint(state.clone()).await;
+        state
+            .persistence_checkpoint_in_flight
+            .store(false, Ordering::Release);
+    });
+}
+
+fn configured_async_checkpoints() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        let Ok(raw) = std::env::var("AIONBD_ASYNC_CHECKPOINTS") else {
+            return ASYNC_CHECKPOINTS_DEFAULT;
+        };
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => true,
+            "0" | "false" | "no" | "off" => false,
+            _ => {
+                tracing::warn!(
+                    %raw,
+                    default = ASYNC_CHECKPOINTS_DEFAULT,
+                    "invalid AIONBD_ASYNC_CHECKPOINTS; using default"
+                );
+                ASYNC_CHECKPOINTS_DEFAULT
+            }
+        }
+    })
+}
+
+async fn run_checkpoint(state: AppState) {
+    let snapshot_path = state.config.snapshot_path.clone();
+    let wal_path = state.config.wal_path.clone();
+    let checkpoint_policy = CheckpointPolicy {
+        incremental_compact_after: CHECKPOINT_COMPACT_AFTER,
+    };
+    match run_serialized_persistence_io(&state, move || {
+        checkpoint_wal_with_policy(&snapshot_path, &wal_path, checkpoint_policy)
+            .map(|_| PersistOutcome::Checkpointed)
+            .or_else(|error| {
+                Ok(PersistOutcome::WalOnly {
+                    reason: error.to_string(),
+                })
+            })
+    })
+    .await
+    {
+        Ok(PersistOutcome::Checkpointed) => {
+            state.storage_available.store(true, Ordering::Relaxed);
+            let _ = state
+                .metrics
+                .persistence_checkpoint_success_total
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(PersistOutcome::WalOnly { reason }) => {
+            state.storage_available.store(false, Ordering::Relaxed);
+            let _ = state
+                .metrics
+                .persistence_checkpoint_degraded_total
+                .fetch_add(1, Ordering::Relaxed);
+            tracing::warn!(%reason, "snapshot checkpoint skipped, relying on wal replay");
+        }
+        Err(error) => {
+            state.storage_available.store(false, Ordering::Relaxed);
+            let _ = state
+                .metrics
+                .persistence_checkpoint_error_total
+                .fetch_add(1, Ordering::Relaxed);
+            tracing::error!(%error, "failed to persist state");
         }
     }
 }

@@ -43,7 +43,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - `ROADMAP_EDGEVECTOR.md` is ignored intentionally in git.
 - This step focuses on project structure and baseline quality.
 - Contribution flow is branch-first local with mandatory expert review before merge (`CONTRIBUTING.md`).
-- Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`).
+- Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`); async checkpoint scheduling is opt-in (`AIONBD_ASYNC_CHECKPOINTS=true`).
 - Search supports explicit modes (`exact`, `ivf`, `auto`) with target recall guarantees
   and metadata filtering (`must`/`should` + range clauses).
 - Benchmark pipeline publishes dataset comparative tables (`recall@k`, p50/p95/p99,

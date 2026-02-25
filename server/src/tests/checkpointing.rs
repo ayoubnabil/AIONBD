@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
+use tokio::time::{sleep, Duration};
 use tower::ServiceExt;
 
 use crate::build_app;
@@ -84,9 +85,20 @@ async fn checkpoint_interval_truncates_wal_periodically() {
         assert_eq!(upsert_resp.status(), StatusCode::OK);
     }
 
-    assert_eq!(
-        fs::read_to_string(&wal_path).expect("wal should be readable"),
-        ""
+    let mut wal_cleared = false;
+    for _ in 0..50 {
+        if fs::read_to_string(&wal_path)
+            .expect("wal should be readable")
+            .is_empty()
+        {
+            wal_cleared = true;
+            break;
+        }
+        sleep(Duration::from_millis(20)).await;
+    }
+    assert!(
+        wal_cleared,
+        "wal should be truncated after async checkpoint"
     );
     cleanup_dir(&root);
 }
