@@ -29,6 +29,8 @@ These are starter values. Tune them after collecting real traffic data.
    in-flight requests stays below 80% of configured concurrency most of the time.
 4. Persistence health:
    no sustained checkpoint degradation (`wal-only`) for more than 15 minutes.
+5. IVF quality guard:
+   explicit `ivf` fallback ratio stays below `25%` over 10 minutes.
 
 ## Dashboard Panels
 
@@ -54,6 +56,12 @@ Create one dashboard with these panels:
    `rate(aionbd_rate_limit_rejections_total[5m])`
 9. Cardinality/load indicators:
    `aionbd_collections`, `aionbd_points`, `aionbd_l2_indexes`
+10. Search execution quality:
+   `rate(aionbd_search_queries_total[5m])`
+   `rate(aionbd_search_ivf_queries_total[5m])`
+   `rate(aionbd_search_ivf_fallback_exact_total[5m])`
+11. IVF fallback ratio:
+   `rate(aionbd_search_ivf_fallback_exact_total[5m]) / clamp_min(rate(aionbd_search_ivf_queries_total[5m]), 1)`
 
 ## Alert Rules (Prometheus Examples)
 
@@ -122,6 +130,20 @@ groups:
         annotations:
           summary: "AIONBD request rate limiting active"
           description: "Tenant request traffic exceeds configured rate limits."
+
+      - alert: AionbdIvfFallbackRatioHigh
+        expr: |
+          (
+            rate(aionbd_search_ivf_fallback_exact_total[10m])
+            /
+            clamp_min(rate(aionbd_search_ivf_queries_total[10m]), 1)
+          ) > 0.25
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD explicit IVF requests are frequently falling back to exact"
+          description: "Fallback ratio stayed above 25%; investigate index cache and build throughput."
 ```
 
 ## First Response Runbook
@@ -140,6 +162,11 @@ When `AionbdHigh5xxRatio` fires:
 1. Split by endpoint in request logs.
 2. Check whether failures correlate with persistence or index build failures.
 3. If persistence is implicated, lower ingest pressure and investigate disk immediately.
+
+When `AionbdIvfFallbackRatioHigh` fires:
+1. Check `aionbd_l2_index_cache_hit_ratio` and `aionbd_l2_index_build_in_flight`.
+2. Check `rate(aionbd_l2_index_build_failures[5m])` and recent mutation rate.
+3. If fallback persists, increase indexing capacity and investigate cache invalidation churn.
 
 ## Notes
 

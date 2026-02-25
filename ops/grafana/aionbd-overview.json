@@ -14,7 +14,11 @@
       "title": "Requests/s",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "rate(aionbd_http_requests_total[5m])", "legendFormat": "requests/s", "refId": "A" }
+        {
+          "expr": "rate(aionbd_http_requests_total[5m])",
+          "legendFormat": "requests/s",
+          "refId": "A"
+        }
       ]
     },
     {
@@ -34,8 +38,16 @@
       "title": "Latency (us)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
-        { "expr": "aionbd_http_request_duration_us_avg", "legendFormat": "avg", "refId": "A" },
-        { "expr": "aionbd_http_request_duration_us_max", "legendFormat": "max_window", "refId": "B" }
+        {
+          "expr": "aionbd_http_request_duration_us_avg",
+          "legendFormat": "avg",
+          "refId": "A"
+        },
+        {
+          "expr": "aionbd_http_request_duration_us_max",
+          "legendFormat": "max_window",
+          "refId": "B"
+        }
       ]
     },
     {
@@ -43,7 +55,11 @@
       "title": "In-flight requests",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
-        { "expr": "aionbd_http_requests_in_flight", "legendFormat": "in_flight", "refId": "A" }
+        {
+          "expr": "aionbd_http_requests_in_flight",
+          "legendFormat": "in_flight",
+          "refId": "A"
+        }
       ]
     },
     {
@@ -52,8 +68,16 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "targets": [
         { "expr": "aionbd_ready", "legendFormat": "ready", "refId": "A" },
-        { "expr": "aionbd_engine_loaded", "legendFormat": "engine_loaded", "refId": "B" },
-        { "expr": "aionbd_storage_available", "legendFormat": "storage_available", "refId": "C" }
+        {
+          "expr": "aionbd_engine_loaded",
+          "legendFormat": "engine_loaded",
+          "refId": "B"
+        },
+        {
+          "expr": "aionbd_storage_available",
+          "legendFormat": "storage_available",
+          "refId": "C"
+        }
       ]
     },
     {
@@ -61,7 +85,11 @@
       "title": "Persistence pressure",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "targets": [
-        { "expr": "rate(aionbd_persistence_writes[5m])", "legendFormat": "writes/s", "refId": "A" },
+        {
+          "expr": "rate(aionbd_persistence_writes[5m])",
+          "legendFormat": "writes/s",
+          "refId": "A"
+        },
         {
           "expr": "rate(aionbd_persistence_checkpoint_degraded_total[5m])",
           "legendFormat": "degraded_checkpoint/s",
@@ -74,8 +102,16 @@
       "title": "Index cache",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "targets": [
-        { "expr": "aionbd_l2_index_cache_hit_ratio", "legendFormat": "hit_ratio", "refId": "A" },
-        { "expr": "aionbd_l2_index_build_in_flight", "legendFormat": "build_in_flight", "refId": "B" },
+        {
+          "expr": "aionbd_l2_index_cache_hit_ratio",
+          "legendFormat": "hit_ratio",
+          "refId": "A"
+        },
+        {
+          "expr": "aionbd_l2_index_build_in_flight",
+          "legendFormat": "build_in_flight",
+          "refId": "B"
+        },
         {
           "expr": "rate(aionbd_l2_index_build_failures[5m])",
           "legendFormat": "build_failures/s",
@@ -88,13 +124,21 @@
       "title": "Security counters",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "targets": [
-        { "expr": "rate(aionbd_auth_failures_total[5m])", "legendFormat": "auth_failures/s", "refId": "A" },
+        {
+          "expr": "rate(aionbd_auth_failures_total[5m])",
+          "legendFormat": "auth_failures/s",
+          "refId": "A"
+        },
         {
           "expr": "rate(aionbd_rate_limit_rejections_total[5m])",
           "legendFormat": "rate_limit_rejections/s",
           "refId": "B"
         },
-        { "expr": "rate(aionbd_audit_events_total[5m])", "legendFormat": "audit_events/s", "refId": "C" }
+        {
+          "expr": "rate(aionbd_audit_events_total[5m])",
+          "legendFormat": "audit_events/s",
+          "refId": "C"
+        }
       ]
     },
     {
@@ -119,9 +163,51 @@
       "title": "Data footprint indicators",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "targets": [
-        { "expr": "aionbd_collections", "legendFormat": "collections", "refId": "A" },
+        {
+          "expr": "aionbd_collections",
+          "legendFormat": "collections",
+          "refId": "A"
+        },
         { "expr": "aionbd_points", "legendFormat": "points", "refId": "B" },
-        { "expr": "aionbd_l2_indexes", "legendFormat": "l2_indexes", "refId": "C" }
+        {
+          "expr": "aionbd_l2_indexes",
+          "legendFormat": "l2_indexes",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Search traffic and IVF usage",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "rate(aionbd_search_queries_total[5m])",
+          "legendFormat": "search_queries/s",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(aionbd_search_ivf_queries_total[5m])",
+          "legendFormat": "ivf_queries/s",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(aionbd_search_ivf_fallback_exact_total[5m])",
+          "legendFormat": "ivf_fallback_exact/s",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "IVF fallback ratio",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        {
+          "expr": "rate(aionbd_search_ivf_fallback_exact_total[5m]) / clamp_min(rate(aionbd_search_ivf_queries_total[5m]), 1)",
+          "legendFormat": "fallback_ratio",
+          "refId": "A"
+        }
       ]
     }
   ],
@@ -135,6 +221,6 @@
   "timezone": "browser",
   "title": "AIONBD Overview",
   "uid": "aionbd-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

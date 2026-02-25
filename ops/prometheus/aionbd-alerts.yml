@@ -80,3 +80,17 @@ groups:
         annotations:
           summary: "AIONBD tenant quota pressure"
           description: "Writes are being rejected by tenant collection/point quotas."
+
+      - alert: AionbdIvfFallbackRatioHigh
+        expr: |
+          (
+            rate(aionbd_search_ivf_fallback_exact_total[10m])
+            /
+            clamp_min(rate(aionbd_search_ivf_queries_total[10m]), 1)
+          ) > 0.25
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD explicit IVF requests are frequently falling back to exact"
+          description: "Fallback ratio stayed above 25%; index cache/build policy may be under-provisioned."
