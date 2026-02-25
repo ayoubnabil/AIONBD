@@ -157,6 +157,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - Sizing guide: `docs/production_sizing.md`
 - Performance tuning guide: `docs/performance_tuning.md`
 - Security notes: `docs/security_notes.md`
+- Soak runbook: `docs/soak_runbook.md`
 
 ## Backup and restore
 
