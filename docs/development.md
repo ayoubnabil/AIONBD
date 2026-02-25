@@ -227,6 +227,26 @@ Fast harness smoke check (no server required):
 python3 scripts/check_soak_harness_smoke.py
 ```
 
+Run soak pipeline profiles with report publication:
+```bash
+python3 scripts/run_soak_pipeline.py \
+  --base-url http://127.0.0.1:8080 \
+  --collection-prefix soak_pipeline \
+  --report-path bench/reports/soak_pipeline_report.md \
+  --report-json-path bench/reports/soak_pipeline_report.json
+```
+
+Quick dry-run validation of soak pipeline:
+```bash
+python3 scripts/check_soak_pipeline_smoke.py
+```
+
+Wrapper for soak pipeline runs:
+```bash
+./scripts/verify_soak.sh
+AIONBD_SOAK_DRY_RUN=1 ./scripts/verify_soak.sh
+```
+
 ## Python SDK commands
 
 From `sdk/python/`:
