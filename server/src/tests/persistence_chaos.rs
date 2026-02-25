@@ -228,3 +228,48 @@ async fn degraded_checkpoint_state_is_recovered_on_restart() {
 
     cleanup_dir(&root);
 }
+
+#[tokio::test]
+async fn disk_full_on_wal_write_marks_storage_unavailable() {
+    let dev_full = Path::new("/dev/full");
+    if !dev_full.exists() {
+        return;
+    }
+
+    let (root, snapshot_path, _wal_path) = persistence_paths();
+    fs::create_dir_all(&root).expect("temp root should be creatable");
+
+    let app = build_app(persistence_state(snapshot_path, dev_full.to_path_buf(), 1));
+    let create_status = create_collection(&app, "disk_full", 3).await;
+    assert_eq!(create_status, StatusCode::INTERNAL_SERVER_ERROR);
+
+    let ready = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/ready")
+                .body(Body::empty())
+                .expect("request must build"),
+        )
+        .await
+        .expect("response expected");
+    assert_eq!(ready.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let metrics = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/metrics")
+                .body(Body::empty())
+                .expect("request must build"),
+        )
+        .await
+        .expect("response expected");
+    assert_eq!(metrics.status(), StatusCode::OK);
+    let metrics_json = super::json_body(metrics).await;
+    assert_eq!(metrics_json["storage_available"], false);
+    assert_eq!(metrics_json["ready"], false);
+
+    cleanup_dir(&root);
+}
