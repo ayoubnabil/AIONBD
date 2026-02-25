@@ -102,6 +102,9 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_storage_available 1"));
     assert!(payload.contains("aionbd_persistence_enabled 0"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
+    assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
+    assert!(payload.contains("aionbd_persistence_incremental_segments 0"));
+    assert!(payload.contains("aionbd_persistence_incremental_size_bytes 0"));
     assert!(payload.contains("aionbd_auth_failures_total 0"));
     assert!(payload.contains("aionbd_rate_limit_rejections_total 0"));
     assert!(payload.contains("aionbd_audit_events_total "));
@@ -186,6 +189,9 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_engine_loaded 0"));
     assert!(payload.contains("aionbd_storage_available 0"));
     assert!(payload.contains("aionbd_persistence_writes 12"));
+    assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
+    assert!(payload.contains("aionbd_persistence_incremental_segments 0"));
+    assert!(payload.contains("aionbd_persistence_incremental_size_bytes 0"));
     assert!(payload.contains("aionbd_auth_failures_total 3"));
     assert!(payload.contains("aionbd_rate_limit_rejections_total 4"));
     assert!(payload.contains("aionbd_audit_events_total 5"));

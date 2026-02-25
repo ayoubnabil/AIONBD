@@ -1,5 +1,9 @@
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use aionbd_core::incremental_snapshot_dir;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
@@ -26,6 +30,23 @@ fn test_state() -> AppState {
     };
 
     AppState::with_collections(config, std::collections::BTreeMap::new())
+}
+
+fn persistence_paths() -> (PathBuf, PathBuf, PathBuf) {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock must be monotonic")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("aionbd_server_metrics_test_{stamp}"));
+    let snapshot = root.join("snapshot.json");
+    let wal = root.join("wal.jsonl");
+    (root, snapshot, wal)
+}
+
+fn cleanup_dir(path: &Path) {
+    if path.exists() {
+        fs::remove_dir_all(path).expect("temp directory should be removable");
+    }
 }
 
 #[tokio::test]
@@ -106,6 +127,9 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["l2_indexes"], 0);
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_writes"], 0);
+    assert_eq!(payload["persistence_wal_size_bytes"], 0);
+    assert_eq!(payload["persistence_incremental_segments"], 0);
+    assert_eq!(payload["persistence_incremental_size_bytes"], 0);
     assert_eq!(payload["auth_failures_total"], 0);
     assert_eq!(payload["rate_limit_rejections_total"], 0);
     assert!(payload["audit_events_total"].as_u64().unwrap_or(0) >= 1);
@@ -222,7 +246,52 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["rate_limit_rejections_total"], 12);
     assert_eq!(payload["audit_events_total"], 13);
     assert_eq!(payload["persistence_writes"], 9);
+    assert_eq!(payload["persistence_wal_size_bytes"], 0);
+    assert_eq!(payload["persistence_incremental_segments"], 0);
+    assert_eq!(payload["persistence_incremental_size_bytes"], 0);
     assert_eq!(payload["search_queries_total"], 21);
     assert_eq!(payload["search_ivf_queries_total"], 8);
     assert_eq!(payload["search_ivf_fallback_exact_total"], 3);
+}
+
+#[tokio::test]
+async fn metrics_report_persistence_backlog_sizes() {
+    let (root, snapshot_path, wal_path) = persistence_paths();
+    fs::create_dir_all(&root).expect("temp root should be creatable");
+    fs::write(&wal_path, b"abcde").expect("wal file should be writable");
+    let incremental_dir = incremental_snapshot_dir(&snapshot_path);
+    fs::create_dir_all(&incremental_dir).expect("incremental dir should be creatable");
+    fs::write(incremental_dir.join("0001.jsonl"), b"12").expect("segment should be writable");
+    fs::write(incremental_dir.join("0002.jsonl"), b"345").expect("segment should be writable");
+    fs::write(incremental_dir.join("ignore.tmp"), b"nope").expect("temp file should be writable");
+
+    let mut state = test_state();
+    {
+        let config = std::sync::Arc::make_mut(&mut state.config);
+        config.persistence_enabled = true;
+        config.snapshot_path = snapshot_path;
+        config.wal_path = wal_path;
+    }
+    let app = build_app(state);
+    let metrics_resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/metrics")
+                .body(Body::empty())
+                .expect("request must build"),
+        )
+        .await
+        .expect("response expected");
+    assert_eq!(metrics_resp.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(metrics_resp.into_body(), usize::MAX)
+        .await
+        .expect("body should be readable");
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("valid json response");
+    assert_eq!(payload["persistence_wal_size_bytes"], 5);
+    assert_eq!(payload["persistence_incremental_segments"], 2);
+    assert_eq!(payload["persistence_incremental_size_bytes"], 5);
+
+    cleanup_dir(&root);
 }

@@ -94,6 +94,21 @@
           "expr": "rate(aionbd_persistence_checkpoint_degraded_total[5m])",
           "legendFormat": "degraded_checkpoint/s",
           "refId": "B"
+        },
+        {
+          "expr": "aionbd_persistence_wal_size_bytes",
+          "legendFormat": "wal_bytes",
+          "refId": "C"
+        },
+        {
+          "expr": "aionbd_persistence_incremental_segments",
+          "legendFormat": "incremental_segments",
+          "refId": "D"
+        },
+        {
+          "expr": "aionbd_persistence_incremental_size_bytes",
+          "legendFormat": "incremental_bytes",
+          "refId": "E"
         }
       ]
     },

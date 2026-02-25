@@ -95,6 +95,15 @@ aionbd_persistence_writes {}\n\
 # HELP aionbd_persistence_checkpoint_degraded_total Total checkpoints that fell back to WAL-only mode.\n\
 # TYPE aionbd_persistence_checkpoint_degraded_total counter\n\
 aionbd_persistence_checkpoint_degraded_total {}\n\
+# HELP aionbd_persistence_wal_size_bytes Current WAL file size in bytes.\n\
+# TYPE aionbd_persistence_wal_size_bytes gauge\n\
+aionbd_persistence_wal_size_bytes {}\n\
+# HELP aionbd_persistence_incremental_segments Current number of incremental snapshot segment files.\n\
+# TYPE aionbd_persistence_incremental_segments gauge\n\
+aionbd_persistence_incremental_segments {}\n\
+# HELP aionbd_persistence_incremental_size_bytes Current total size of incremental snapshot segment files in bytes.\n\
+# TYPE aionbd_persistence_incremental_size_bytes gauge\n\
+aionbd_persistence_incremental_size_bytes {}\n\
 # HELP aionbd_search_queries_total Total search requests handled.\n\
 # TYPE aionbd_search_queries_total counter\n\
 aionbd_search_queries_total {}\n\
@@ -135,6 +144,9 @@ aionbd_search_ivf_fallback_exact_total {}\n",
         bool_as_u8(metrics.persistence_enabled),
         metrics.persistence_writes,
         metrics.persistence_checkpoint_degraded_total,
+        metrics.persistence_wal_size_bytes,
+        metrics.persistence_incremental_segments,
+        metrics.persistence_incremental_size_bytes,
         metrics.search_queries_total,
         metrics.search_ivf_queries_total,
         metrics.search_ivf_fallback_exact_total,

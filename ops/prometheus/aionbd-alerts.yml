@@ -42,6 +42,34 @@ groups:
           summary: "AIONBD persistence running in WAL-only degraded mode"
           description: "Checkpointing keeps degrading; investigate disk and snapshot path health."
 
+      - alert: AionbdWalBacklogGrowing
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_wal_size_bytes > 268435456
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL backlog is growing"
+          description: "WAL size stayed above 256 MiB; checkpoint throughput may be insufficient."
+
+      - alert: AionbdIncrementalBacklogGrowing
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          (
+            aionbd_persistence_incremental_segments > 64
+            or
+            aionbd_persistence_incremental_size_bytes > 1073741824
+          )
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD incremental snapshot backlog is growing"
+          description: "Incremental snapshot backlog stayed high; compaction may be lagging."
+
       - alert: AionbdIndexBuildFailing
         expr: rate(aionbd_l2_index_build_failures[5m]) > 0
         for: 10m

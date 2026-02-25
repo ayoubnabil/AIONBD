@@ -29,7 +29,9 @@ These are starter values. Tune them after collecting real traffic data.
    in-flight requests stays below 80% of configured concurrency most of the time.
 4. Persistence health:
    no sustained checkpoint degradation (`wal-only`) for more than 15 minutes.
-5. IVF quality guard:
+5. Persistence backlog:
+   WAL/incremental backlog remains bounded (no sustained growth above operational thresholds).
+6. IVF quality guard:
    explicit `ivf` fallback ratio stays below `25%` over 10 minutes.
 
 ## Dashboard Panels
@@ -48,6 +50,9 @@ Create one dashboard with these panels:
    `aionbd_ready`, `aionbd_engine_loaded`, `aionbd_storage_available`
 6. Persistence behavior:
    `rate(aionbd_persistence_writes[5m])`, `rate(aionbd_persistence_checkpoint_degraded_total[5m])`
+   `aionbd_persistence_wal_size_bytes`
+   `aionbd_persistence_incremental_segments`
+   `aionbd_persistence_incremental_size_bytes`
 7. Index cache quality:
    `aionbd_l2_index_cache_hit_ratio`, `aionbd_l2_index_build_in_flight`, `rate(aionbd_l2_index_build_failures[5m])`
 8. Quota and abuse signals:
@@ -100,6 +105,34 @@ groups:
         annotations:
           summary: "AIONBD persistence running in WAL-only degraded mode"
           description: "Checkpointing keeps degrading; investigate snapshot and disk health."
+
+      - alert: AionbdWalBacklogGrowing
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_wal_size_bytes > 268435456
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL backlog is growing"
+          description: "WAL size stayed above 256 MiB; checkpoint throughput may be insufficient."
+
+      - alert: AionbdIncrementalBacklogGrowing
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          (
+            aionbd_persistence_incremental_segments > 64
+            or
+            aionbd_persistence_incremental_size_bytes > 1073741824
+          )
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD incremental snapshot backlog is growing"
+          description: "Incremental backlog stayed high; compaction may be lagging."
 
       - alert: AionbdIndexBuildFailing
         expr: rate(aionbd_l2_index_build_failures[5m]) > 0
@@ -157,6 +190,11 @@ When `AionbdCheckpointDegraded` fires:
 1. Confirm WAL write rate (`aionbd_persistence_writes`) and checkpoint degradation rate.
 2. Inspect snapshot path permissions and available disk.
 3. Trigger controlled restart only after confirming WAL/snapshot files are healthy.
+
+When `AionbdWalBacklogGrowing` or `AionbdIncrementalBacklogGrowing` fires:
+1. Check `aionbd_persistence_wal_size_bytes`, `aionbd_persistence_incremental_segments`, and `aionbd_persistence_incremental_size_bytes`.
+2. Correlate with `rate(aionbd_persistence_writes[5m])` and checkpoint degradation events.
+3. If growth is sustained, reduce ingest pressure and investigate checkpoint/compaction throughput.
 
 When `AionbdHigh5xxRatio` fires:
 1. Split by endpoint in request logs.

@@ -1,5 +1,7 @@
+use std::fs;
 use std::sync::atomic::Ordering;
 
+use aionbd_core::incremental_snapshot_dir;
 use axum::extract::State;
 use axum::http::header;
 use axum::Json;
@@ -67,6 +69,11 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
     };
     let engine_loaded = state.engine_loaded.load(Ordering::Relaxed);
     let storage_available = state.storage_available.load(Ordering::Relaxed);
+    let (
+        persistence_wal_size_bytes,
+        persistence_incremental_segments,
+        persistence_incremental_size_bytes,
+    ) = persistence_backlog(state);
 
     Ok(MetricsResponse {
         uptime_ms: state.started_at.elapsed().as_millis() as u64,
@@ -136,6 +143,9 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .metrics
             .persistence_checkpoint_degraded_total
             .load(Ordering::Relaxed),
+        persistence_wal_size_bytes,
+        persistence_incremental_segments,
+        persistence_incremental_size_bytes,
         search_queries_total: state.metrics.search_queries_total.load(Ordering::Relaxed),
         search_ivf_queries_total: state
             .metrics
@@ -163,4 +173,35 @@ fn stable_http_duration_totals(state: &AppState) -> (u64, u64) {
         }
     }
     fallback
+}
+
+fn persistence_backlog(state: &AppState) -> (u64, u64, u64) {
+    if !state.config.persistence_enabled {
+        return (0, 0, 0);
+    }
+
+    let wal_size_bytes = fs::metadata(&state.config.wal_path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+    let incremental_dir = incremental_snapshot_dir(&state.config.snapshot_path);
+    let mut incremental_segments = 0u64;
+    let mut incremental_size_bytes = 0u64;
+
+    if let Ok(entries) = fs::read_dir(incremental_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .extension()
+                .is_none_or(|extension| extension != "jsonl")
+            {
+                continue;
+            }
+            incremental_segments = incremental_segments.saturating_add(1);
+            if let Ok(metadata) = entry.metadata() {
+                incremental_size_bytes = incremental_size_bytes.saturating_add(metadata.len());
+            }
+        }
+    }
+
+    (wal_size_bytes, incremental_segments, incremental_size_bytes)
 }
