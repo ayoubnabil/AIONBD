@@ -17,9 +17,8 @@ pub(crate) async fn persist_change_if_enabled(
     state: &AppState,
     record: &WalRecord,
 ) -> Result<(), ApiError> {
-    invalidate_cached_l2_index(state, record);
-
     if !state.config.persistence_enabled {
+        invalidate_cached_l2_index(state, record);
         return Ok(());
     }
 
@@ -35,6 +34,7 @@ pub(crate) async fn persist_change_if_enabled(
         tracing::error!(%error, "failed to append wal record");
         return Err(ApiError::internal("failed to persist state"));
     }
+    invalidate_cached_l2_index(state, record);
 
     let writes_since_start = state
         .metrics

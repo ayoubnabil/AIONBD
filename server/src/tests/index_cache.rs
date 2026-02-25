@@ -1,6 +1,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
+use std::path::Path;
 use tower::ServiceExt;
 
 use aionbd_core::{Collection, CollectionConfig};
@@ -25,6 +26,25 @@ fn test_state() -> AppState {
         persistence_enabled: false,
         snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
         wal_path: std::path::PathBuf::from("unused_wal.jsonl"),
+    };
+
+    AppState::with_collections(config, std::collections::BTreeMap::new())
+}
+
+fn persistence_state(wal_path: std::path::PathBuf) -> AppState {
+    let config = AppConfig {
+        bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
+        max_dimension: 8,
+        strict_finite: true,
+        request_timeout_ms: 2_000,
+        max_body_bytes: 1_048_576,
+        max_concurrency: 256,
+        max_page_limit: 1_000,
+        max_topk_limit: 1_000,
+        checkpoint_interval: 1,
+        persistence_enabled: true,
+        snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
+        wal_path,
     };
 
     AppState::with_collections(config, std::collections::BTreeMap::new())
@@ -184,4 +204,37 @@ fn invalidating_cache_does_not_cancel_in_flight_build_marker() {
         .read()
         .expect("l2 index building lock should be available")
         .contains("cache_keep_building"));
+}
+
+#[tokio::test]
+async fn wal_append_failure_keeps_cached_l2_index() {
+    let dev_full = Path::new("/dev/full");
+    if !dev_full.exists() {
+        return;
+    }
+
+    let state = persistence_state(dev_full.to_path_buf());
+    seed_cached_l2_index(&state, "cache_wal_fail");
+    let app = build_app(state.clone());
+
+    assert!(state
+        .l2_indexes
+        .read()
+        .expect("l2 index cache lock should be available")
+        .contains_key("cache_wal_fail"));
+
+    let upsert_req = Request::builder()
+        .method("PUT")
+        .uri("/collections/cache_wal_fail/points/1")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({"values": [123.0, 0.0]}).to_string()))
+        .expect("request must build");
+    let upsert_resp = app.oneshot(upsert_req).await.expect("response expected");
+    assert_eq!(upsert_resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    assert!(state
+        .l2_indexes
+        .read()
+        .expect("l2 index cache lock should be available")
+        .contains_key("cache_wal_fail"));
 }
