@@ -191,6 +191,15 @@ groups:
           summary: "AIONBD tenant tracking cardinality is high"
           description: "Tenant tracking maps grew beyond expected bounds; inspect abusive traffic and retention behavior."
 
+      - alert: AionbdCollectionWriteLocksCardinalityHigh
+        expr: aionbd_collection_write_lock_entries > 10000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD collection write lock cardinality is high"
+          description: "Collection write lock entries stayed high; inspect stale lock cleanup and collection churn patterns."
+
       - alert: AionbdRateLimitPressure
         expr: rate(aionbd_rate_limit_rejections_total[10m]) > 0
         for: 10m
@@ -246,6 +255,11 @@ When `AionbdTenantTrackingCardinalityHigh` fires:
 1. Inspect `aionbd_tenant_rate_window_entries` and `aionbd_tenant_quota_lock_entries`.
 2. Correlate with rate-limit pressure and tenant churn.
 3. Investigate abusive credential rotation and tighten ingress controls.
+
+When `AionbdCollectionWriteLocksCardinalityHigh` fires:
+1. Inspect `aionbd_collection_write_lock_entries` growth against collection churn.
+2. Correlate with spikes in failed writes to missing collections.
+3. If sustained, reduce abusive traffic and verify lock cleanup behavior.
 
 When `AionbdHigh5xxRatio` fires:
 1. Split by endpoint in request logs.

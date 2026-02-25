@@ -139,6 +139,15 @@ groups:
           summary: "AIONBD tenant tracking cardinality is high"
           description: "Tenant tracking maps grew beyond expected bounds; inspect abusive traffic and retention behavior."
 
+      - alert: AionbdCollectionWriteLocksCardinalityHigh
+        expr: aionbd_collection_write_lock_entries > 10000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD collection write lock cardinality is high"
+          description: "Collection write lock entries stayed high; inspect stale lock cleanup and collection churn patterns."
+
       - alert: AionbdIvfFallbackRatioHigh
         expr: |
           (
