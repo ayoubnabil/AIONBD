@@ -154,6 +154,9 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 
 - Prometheus alert rules: `ops/prometheus/aionbd-alerts.yml`
 - Grafana dashboard: `ops/grafana/aionbd-overview.json`
+- Sizing guide: `docs/production_sizing.md`
+- Performance tuning guide: `docs/performance_tuning.md`
+- Security notes: `docs/security_notes.md`
 
 ## Backup and restore
 
