@@ -51,3 +51,26 @@ jobs:
           path: |
             bench/reports/search_quality_report.md
             bench/reports/search_quality_report.json
+
+  soak-pipeline-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Soak pipeline dry-run
+        env:
+          AIONBD_SOAK_DRY_RUN: "1"
+          AIONBD_SOAK_REPORT_PATH: "bench/reports/soak_pipeline_report.md"
+          AIONBD_SOAK_REPORT_JSON_PATH: "bench/reports/soak_pipeline_report.json"
+        run: ./scripts/verify_soak.sh
+      - name: Upload soak pipeline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-pipeline-report
+          path: |
+            bench/reports/soak_pipeline_report.md
+            bench/reports/soak_pipeline_report.json
