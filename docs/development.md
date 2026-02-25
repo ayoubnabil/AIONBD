@@ -176,6 +176,30 @@ Ops smoke check for backup/restore tooling:
 python3 scripts/check_backup_restore_smoke.py
 ```
 
+## Collection export/import
+
+Export one collection as NDJSON stream:
+```bash
+python3 scripts/collection_export_import.py export \
+  --base-url http://127.0.0.1:8080 \
+  --collection demo \
+  --output exports/demo.ndjson
+```
+
+Import into a target collection:
+```bash
+python3 scripts/collection_export_import.py import \
+  --base-url http://127.0.0.1:8080 \
+  --input exports/demo.ndjson \
+  --collection demo_copy \
+  --if-exists fail
+```
+
+Offline smoke check for export/import tooling:
+```bash
+python3 scripts/check_collection_export_import_smoke.py
+```
+
 ## Python SDK commands
 
 From `sdk/python/`:
