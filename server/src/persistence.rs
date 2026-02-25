@@ -75,14 +75,13 @@ async fn run_serialized_persistence_io<T>(
 where
     T: Send + 'static,
 {
-    let serial = Arc::clone(&state.persistence_io_serial);
-    run_persistence_io(move || {
-        let _guard = serial.lock().map_err(|_| {
-            PersistenceError::InvalidData("persistence io serial lock poisoned".to_string())
+    let _guard = Arc::clone(&state.persistence_io_serial)
+        .acquire_owned()
+        .await
+        .map_err(|_| {
+            PersistenceError::InvalidData("persistence io serial semaphore closed".to_string())
         })?;
-        operation()
-    })
-    .await
+    run_persistence_io(operation).await
 }
 
 fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {

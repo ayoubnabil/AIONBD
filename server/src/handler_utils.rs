@@ -193,7 +193,12 @@ pub(crate) fn remove_collection_write_lock(
         .collection_write_locks
         .lock()
         .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
-    let _ = locks.remove(canonical_name);
+    let should_remove = locks
+        .get(canonical_name)
+        .is_some_and(|lock| Arc::strong_count(lock) == 1);
+    if should_remove {
+        let _ = locks.remove(canonical_name);
+    }
     Ok(())
 }
 

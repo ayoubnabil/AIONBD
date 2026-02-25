@@ -96,3 +96,69 @@ async fn metadata_match_treats_integer_and_float_numbers_as_equal() {
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("valid json response");
     assert_eq!(payload["hits"][0]["id"], 1);
 }
+
+#[tokio::test]
+async fn metadata_match_uses_tolerant_float_comparison() {
+    let app = build_app(test_state());
+
+    let create_req = Request::builder()
+        .method("POST")
+        .uri("/collections")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"name": "float_filter", "dimension": 2}).to_string(),
+        ))
+        .expect("request must build");
+    let create_resp = app
+        .clone()
+        .oneshot(create_req)
+        .await
+        .expect("response expected");
+    assert_eq!(create_resp.status(), StatusCode::OK);
+
+    let value = 0.1_f64 + 0.2_f64;
+    let upsert_req = Request::builder()
+        .method("PUT")
+        .uri("/collections/float_filter/points/1")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"values": [1.0, 0.0], "payload": {"score": value}}).to_string(),
+        ))
+        .expect("request must build");
+    let upsert_resp = app
+        .clone()
+        .oneshot(upsert_req)
+        .await
+        .expect("response expected");
+    assert_eq!(upsert_resp.status(), StatusCode::OK);
+
+    let search_req = Request::builder()
+        .method("POST")
+        .uri("/collections/float_filter/search/topk")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "query": [1.0, 0.0],
+                "metric": "dot",
+                "mode": "exact",
+                "limit": 5,
+                "filter": {
+                    "must": [{"field": "score", "value": 0.3}]
+                }
+            })
+            .to_string(),
+        ))
+        .expect("request must build");
+    let search_resp = app
+        .clone()
+        .oneshot(search_req)
+        .await
+        .expect("response expected");
+    assert_eq!(search_resp.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(search_resp.into_body(), usize::MAX)
+        .await
+        .expect("body should be readable");
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("valid json response");
+    assert_eq!(payload["hits"][0]["id"], 1);
+}

@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use aionbd_core::load_collections;
+use aionbd_core::{checkpoint_wal, load_collections, PersistOutcome};
 use anyhow::{Context, Result};
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::DefaultBodyLimit;
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
     let state =
         AppState::with_collections_and_auth(config.clone(), initial_collections, auth_config);
     warmup_l2_indexes(&state);
-    let app = build_app(state);
+    let app = build_app(state.clone());
 
     let listener = tokio::net::TcpListener::bind(bind)
         .await
@@ -102,6 +102,7 @@ async fn main() -> Result<()> {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .context("server exited unexpectedly")?;
+    checkpoint_before_exit(&state).await;
 
     Ok(())
 }
@@ -183,6 +184,30 @@ async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
         Ok(()) => tracing::info!("shutdown signal received"),
         Err(error) => tracing::error!(%error, "failed to install Ctrl-C handler"),
+    }
+}
+
+async fn checkpoint_before_exit(state: &AppState) {
+    if !state.config.persistence_enabled {
+        return;
+    }
+    let snapshot_path = state.config.snapshot_path.clone();
+    let wal_path = state.config.wal_path.clone();
+    let result =
+        tokio::task::spawn_blocking(move || checkpoint_wal(&snapshot_path, &wal_path)).await;
+    match result {
+        Ok(Ok(PersistOutcome::Checkpointed)) => {
+            tracing::info!("shutdown checkpoint completed");
+        }
+        Ok(Ok(PersistOutcome::WalOnly { reason })) => {
+            tracing::warn!(%reason, "shutdown checkpoint degraded to wal-only");
+        }
+        Ok(Err(error)) => {
+            tracing::warn!(%error, "shutdown checkpoint failed");
+        }
+        Err(error) => {
+            tracing::warn!(%error, "shutdown checkpoint task failed");
+        }
     }
 }
 

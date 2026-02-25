@@ -8,7 +8,7 @@ use tower::ServiceExt;
 use crate::auth::{AuthConfig, AuthMode};
 use crate::build_app;
 use crate::config::AppConfig;
-use crate::state::AppState;
+use crate::state::{AppState, TenantRateWindow};
 
 fn auth_state() -> AppState {
     let config = AppConfig {
@@ -161,4 +161,47 @@ async fn tenants_are_scoped_per_resource_name() {
     assert!(registry.contains_key("tenant_a::demo"));
     assert!(registry.contains_key("tenant_b::demo"));
     assert!(!registry.contains_key("demo"));
+}
+
+#[tokio::test]
+async fn rate_limit_windows_are_pruned() {
+    let mut state = auth_state();
+    let mut auth_config = (*state.auth_config).clone();
+    auth_config.rate_limit_per_minute = 10;
+    state = AppState::with_collections_and_auth(
+        (*state.config).clone(),
+        std::collections::BTreeMap::new(),
+        auth_config,
+    );
+
+    state
+        .tenant_rate_windows
+        .lock()
+        .expect("tenant rate windows should be lockable")
+        .insert(
+            "stale".to_string(),
+            TenantRateWindow {
+                minute: 0,
+                count: 1,
+            },
+        );
+
+    let app = build_app(state.clone());
+    let response = app
+        .oneshot(request_with_api_key(
+            "GET",
+            "/collections",
+            Some("key-a"),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let windows = state
+        .tenant_rate_windows
+        .lock()
+        .expect("tenant rate windows should be lockable");
+    assert!(!windows.contains_key("stale"));
+    assert!(windows.contains_key("tenant_a"));
 }

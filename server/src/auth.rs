@@ -17,6 +17,8 @@ use self::env::{
     parse_auth_mode, parse_tenant_credentials, parse_tenant_credentials_with_fallback, parse_u64,
 };
 
+const RATE_WINDOW_RETENTION_MINUTES: u64 = 60;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AuthMode {
     Disabled,
@@ -249,6 +251,9 @@ fn enforce_rate_limit(state: &AppState, tenant: &TenantContext) -> Result<(), Ap
         .tenant_rate_windows
         .lock()
         .map_err(|_| ApiError::internal("tenant rate limit lock poisoned"))?;
+    windows.retain(|_, window| {
+        now_minute.saturating_sub(window.minute) <= RATE_WINDOW_RETENTION_MINUTES
+    });
     let entry = windows
         .entry(tenant.tenant_key().to_string())
         .or_insert(TenantRateWindow {

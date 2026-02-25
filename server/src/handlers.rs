@@ -41,7 +41,7 @@ pub(crate) async fn create_collection(
     let collection = Collection::new(name.clone(), config).map_err(map_collection_error)?;
     let handle = std::sync::Arc::new(std::sync::RwLock::new(collection));
 
-    let _collection_guard = collection_write_lock(&state, &name)?
+    let collection_guard = collection_write_lock(&state, &name)?
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
@@ -69,6 +69,7 @@ pub(crate) async fn create_collection(
     )
     .await
     {
+        drop(collection_guard);
         let _ = remove_collection_write_lock(&state, &name);
         return Err(error);
     }
@@ -135,7 +136,7 @@ pub(crate) async fn delete_collection(
 ) -> Result<Json<DeleteCollectionResponse>, ApiError> {
     let response_name = canonical_collection_name(&name)?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
-    let _collection_guard = existing_collection_write_lock(&state, &name)?
+    let collection_guard = existing_collection_write_lock(&state, &name)?
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
@@ -160,6 +161,7 @@ pub(crate) async fn delete_collection(
             .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
         let _ = collections.remove(&name);
     }
+    drop(collection_guard);
     let _ = remove_collection_write_lock(&state, &name);
 
     Ok(Json(DeleteCollectionResponse {

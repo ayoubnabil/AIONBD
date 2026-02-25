@@ -5,6 +5,7 @@ use tower::ServiceExt;
 
 use crate::build_app;
 use crate::config::AppConfig;
+use crate::handler_utils::remove_collection_write_lock;
 use crate::state::AppState;
 
 fn test_state(max_page_limit: usize, max_topk_limit: usize) -> AppState {
@@ -230,4 +231,36 @@ async fn search_top_k_uses_capped_default_limit_when_limit_is_omitted() {
         1
     );
     assert_eq!(payload["hits"][0]["id"], 1);
+}
+
+#[test]
+fn remove_collection_write_lock_keeps_shared_lock_and_removes_when_idle() {
+    let state = test_state(1_000, 1_000);
+    let name = "demo";
+
+    let shared_lock = {
+        let mut locks = state
+            .collection_write_locks
+            .lock()
+            .expect("collection lock map should be available");
+        let lock = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
+        let cloned = lock.clone();
+        locks.insert(name.to_string(), lock);
+        cloned
+    };
+
+    remove_collection_write_lock(&state, name).expect("lock removal should not fail");
+    assert!(state
+        .collection_write_locks
+        .lock()
+        .expect("collection lock map should be available")
+        .contains_key(name));
+
+    drop(shared_lock);
+    remove_collection_write_lock(&state, name).expect("lock removal should not fail");
+    assert!(!state
+        .collection_write_locks
+        .lock()
+        .expect("collection lock map should be available")
+        .contains_key(name));
 }

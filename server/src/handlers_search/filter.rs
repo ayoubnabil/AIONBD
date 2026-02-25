@@ -118,7 +118,15 @@ fn matches_clause(payload: &PointPayload, clause: &FilterClause) -> bool {
 
 fn metadata_values_match(left: &MetadataValue, right: &MetadataValue) -> bool {
     match (left.as_f64(), right.as_f64()) {
-        (Some(left_num), Some(right_num)) => left_num == right_num,
+        (Some(left_num), Some(right_num)) => approx_equal_f64(left_num, right_num),
         _ => left == right,
     }
+}
+
+fn approx_equal_f64(left: f64, right: f64) -> bool {
+    if !left.is_finite() || !right.is_finite() {
+        return false;
+    }
+    let scale = left.abs().max(right.abs()).max(1.0);
+    (left - right).abs() <= f64::EPSILON * scale * 8.0
 }
