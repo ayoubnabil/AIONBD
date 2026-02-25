@@ -1,6 +1,7 @@
 use aionbd_core::WalRecord;
 use axum::extract::{Extension, Path, Query, State};
 use axum::Json;
+use tokio::task;
 
 use crate::auth::TenantContext;
 use crate::errors::ApiError;
@@ -47,30 +48,43 @@ pub(crate) async fn list_points(
     }
     let limit = requested_limit.min(max_page_limit);
 
-    let (_, collection) = collection_handle(&state, &name, &tenant)?;
-    let collection = collection
-        .read()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+    let state_for_list = state.clone();
+    let tenant_for_list = tenant.clone();
+    let name_for_list = name.clone();
+    let (total, ids, next_offset, next_after_id) = task::spawn_blocking(move || {
+        let (_, collection) = collection_handle(&state_for_list, &name_for_list, &tenant_for_list)?;
+        let collection = collection
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
 
-    let total = collection.len();
-    let (ids, next_offset, next_after_id) = if let Some(after_id) = query.after_id {
-        let (ids, next_after_id) = collection.point_ids_page_after(Some(after_id), limit);
-        (ids, None, next_after_id)
-    } else {
-        let ids = collection.point_ids_page(query.offset, limit);
-        let consumed = query.offset.saturating_add(ids.len());
-        let next_offset = if consumed < total {
-            Some(consumed)
+        let total = collection.len();
+        let (ids, next_offset, next_after_id) = if let Some(after_id) = query.after_id {
+            let (ids, next_after_id) = collection.point_ids_page_after(Some(after_id), limit);
+            (ids, None, next_after_id)
         } else {
-            None
+            let ids = collection.point_ids_page(query.offset, limit);
+            let consumed = query.offset.saturating_add(ids.len());
+            let next_offset = if consumed < total {
+                Some(consumed)
+            } else {
+                None
+            };
+            let next_after_id = if next_offset.is_some() {
+                ids.last().copied()
+            } else {
+                None
+            };
+            (ids, next_offset, next_after_id)
         };
-        let next_after_id = if next_offset.is_some() {
-            ids.last().copied()
-        } else {
-            None
-        };
-        (ids, next_offset, next_after_id)
-    };
+        Ok::<(usize, Vec<u64>, Option<usize>, Option<u64>), ApiError>((
+            total,
+            ids,
+            next_offset,
+            next_after_id,
+        ))
+    })
+    .await
+    .map_err(|_| ApiError::internal("point listing worker task failed"))??;
     let points: Vec<PointIdResponse> = ids.into_iter().map(|id| PointIdResponse { id }).collect();
 
     Ok(Json(ListPointsResponse {
@@ -86,19 +100,27 @@ pub(crate) async fn get_point(
     State(state): State<AppState>,
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<PointResponse>, ApiError> {
-    let (_, handle) = collection_handle(&state, &name, &tenant)?;
-    let collection = handle
-        .read()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-    let (values, payload) = collection
-        .get_point_record(id)
-        .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?;
+    let state_for_get = state.clone();
+    let tenant_for_get = tenant.clone();
+    let name_for_get = name.clone();
+    let response = task::spawn_blocking(move || {
+        let (_, handle) = collection_handle(&state_for_get, &name_for_get, &tenant_for_get)?;
+        let collection = handle
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        let (values, payload) = collection
+            .get_point_record(id)
+            .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?;
 
-    Ok(Json(PointResponse {
-        id,
-        values: values.to_vec(),
-        payload: payload.clone(),
-    }))
+        Ok::<PointResponse, ApiError>(PointResponse {
+            id,
+            values: values.to_vec(),
+            payload: payload.clone(),
+        })
+    })
+    .await
+    .map_err(|_| ApiError::internal("point lookup worker task failed"))??;
+    Ok(Json(response))
 }
 
 pub(crate) async fn delete_point(

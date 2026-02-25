@@ -2,6 +2,7 @@ use aionbd_core::{Collection, CollectionConfig, WalRecord};
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Extension, Path, State};
 use axum::Json;
+use tokio::task;
 
 use crate::auth::TenantContext;
 use crate::errors::{map_collection_error, map_json_rejection, ApiError};
@@ -94,24 +95,33 @@ pub(crate) async fn list_collections(
     State(state): State<AppState>,
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<ListCollectionsResponse>, ApiError> {
-    let collections = state
-        .collections
-        .read()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-
-    let mut items = Vec::with_capacity(collections.len());
-    for collection in collections.values() {
-        let collection = collection
+    let state_for_list = state.clone();
+    let tenant_for_list = tenant.clone();
+    let response = task::spawn_blocking(move || {
+        let collections = state_for_list
+            .collections
             .read()
-            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-        let Some(name) = visible_collection_name(&state, collection.name(), &tenant)? else {
-            continue;
-        };
-        let mut response = build_collection_response(&collection);
-        response.name = name;
-        items.push(response);
-    }
-    Ok(Json(ListCollectionsResponse { collections: items }))
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+        let mut items = Vec::with_capacity(collections.len());
+        for collection in collections.values() {
+            let collection = collection
+                .read()
+                .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+            let Some(name) =
+                visible_collection_name(&state_for_list, collection.name(), &tenant_for_list)?
+            else {
+                continue;
+            };
+            let mut response = build_collection_response(&collection);
+            response.name = name;
+            items.push(response);
+        }
+        Ok::<ListCollectionsResponse, ApiError>(ListCollectionsResponse { collections: items })
+    })
+    .await
+    .map_err(|_| ApiError::internal("collection listing worker task failed"))??;
+    Ok(Json(response))
 }
 
 pub(crate) async fn get_collection(
@@ -120,11 +130,18 @@ pub(crate) async fn get_collection(
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
     let response_name = canonical_collection_name(&name)?;
-    let (_, handle) = collection_handle(&state, &name, &tenant)?;
-    let collection = handle
-        .read()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-    let mut response = build_collection_response(&collection);
+    let state_for_get = state.clone();
+    let tenant_for_get = tenant.clone();
+    let name_for_get = name.clone();
+    let mut response = task::spawn_blocking(move || {
+        let (_, handle) = collection_handle(&state_for_get, &name_for_get, &tenant_for_get)?;
+        let collection = handle
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        Ok::<CollectionResponse, ApiError>(build_collection_response(&collection))
+    })
+    .await
+    .map_err(|_| ApiError::internal("collection lookup worker task failed"))??;
     response.name = response_name;
     Ok(Json(response))
 }

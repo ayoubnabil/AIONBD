@@ -31,6 +31,7 @@ pub(crate) struct MetricsState {
     pub(crate) http_requests_5xx_total: AtomicU64,
     pub(crate) http_request_duration_us_total: AtomicU64,
     pub(crate) http_request_duration_us_max: AtomicU64,
+    pub(crate) http_request_duration_us_max_window_minute: AtomicU64,
     pub(crate) persistence_writes: AtomicU64,
     pub(crate) l2_index_cache_lookups: AtomicU64,
     pub(crate) l2_index_cache_hits: AtomicU64,

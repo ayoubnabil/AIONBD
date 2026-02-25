@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 use axum::extract::State;
 use axum::http::header;
 use axum::Json;
+use tokio::task;
 
 use crate::errors::ApiError;
 use crate::index_manager::{l2_build_in_flight, l2_cache_hit_ratio};
@@ -12,13 +13,20 @@ use crate::state::AppState;
 pub(crate) async fn metrics(
     State(state): State<AppState>,
 ) -> Result<Json<MetricsResponse>, ApiError> {
-    Ok(Json(collect_metrics(&state)?))
+    let state_for_metrics = state.clone();
+    let payload = task::spawn_blocking(move || collect_metrics(&state_for_metrics))
+        .await
+        .map_err(|_| ApiError::internal("metrics worker task failed"))??;
+    Ok(Json(payload))
 }
 
 pub(crate) async fn metrics_prometheus(
     State(state): State<AppState>,
 ) -> Result<impl axum::response::IntoResponse, ApiError> {
-    let metrics = collect_metrics(&state)?;
+    let state_for_metrics = state.clone();
+    let metrics = task::spawn_blocking(move || collect_metrics(&state_for_metrics))
+        .await
+        .map_err(|_| ApiError::internal("metrics worker task failed"))??;
     let body = format!(
         "# HELP aionbd_uptime_ms Process uptime in milliseconds.\n\
 # TYPE aionbd_uptime_ms gauge\n\

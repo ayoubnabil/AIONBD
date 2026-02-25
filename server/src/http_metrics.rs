@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
 use axum::extract::State;
@@ -51,9 +52,46 @@ pub(crate) async fn track_http_metrics(
         .metrics
         .http_request_duration_us_total
         .fetch_add(elapsed_us, Ordering::Relaxed);
+    maybe_rotate_max_window(&state);
     update_max(&state.metrics.http_request_duration_us_max, elapsed_us);
 
     response
+}
+
+fn maybe_rotate_max_window(state: &AppState) {
+    let now_minute = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        / 60;
+    loop {
+        let current_minute = state
+            .metrics
+            .http_request_duration_us_max_window_minute
+            .load(Ordering::Relaxed);
+        if current_minute >= now_minute {
+            return;
+        }
+        if state
+            .metrics
+            .http_request_duration_us_max_window_minute
+            .compare_exchange_weak(
+                current_minute,
+                now_minute,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            if current_minute != 0 {
+                state
+                    .metrics
+                    .http_request_duration_us_max
+                    .store(0, Ordering::Relaxed);
+            }
+            return;
+        }
+    }
 }
 
 fn update_max(max: &std::sync::atomic::AtomicU64, observed: u64) {
