@@ -7,6 +7,7 @@ use crate::build_app;
 use crate::config::AppConfig;
 use crate::state::AppState;
 mod auth_isolation;
+mod auth_quotas;
 mod checkpointing;
 mod collection_deletion;
 mod filtering;

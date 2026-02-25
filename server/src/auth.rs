@@ -33,6 +33,8 @@ pub(crate) struct AuthConfig {
     pub(crate) api_key_to_tenant: BTreeMap<String, String>,
     pub(crate) bearer_token_to_tenant: BTreeMap<String, String>,
     pub(crate) rate_limit_per_minute: u64,
+    pub(crate) tenant_max_collections: u64,
+    pub(crate) tenant_max_points: u64,
 }
 
 impl Default for AuthConfig {
@@ -42,6 +44,8 @@ impl Default for AuthConfig {
             api_key_to_tenant: BTreeMap::new(),
             bearer_token_to_tenant: BTreeMap::new(),
             rate_limit_per_minute: 0,
+            tenant_max_collections: 0,
+            tenant_max_points: 0,
         }
     }
 }
@@ -73,6 +77,8 @@ Tokens are treated as opaque bearer credentials."
             "AIONBD_AUTH_JWT_TOKENS",
         )?;
         let rate_limit_per_minute = parse_u64("AIONBD_AUTH_RATE_LIMIT_PER_MINUTE", 0)?;
+        let tenant_max_collections = parse_u64("AIONBD_AUTH_TENANT_MAX_COLLECTIONS", 0)?;
+        let tenant_max_points = parse_u64("AIONBD_AUTH_TENANT_MAX_POINTS", 0)?;
 
         if matches!(mode, AuthMode::ApiKey | AuthMode::ApiKeyOrBearerToken)
             && api_key_to_tenant.is_empty()
@@ -92,6 +98,8 @@ Tokens are treated as opaque bearer credentials."
             api_key_to_tenant,
             bearer_token_to_tenant,
             rate_limit_per_minute,
+            tenant_max_collections,
+            tenant_max_points,
         })
     }
 

@@ -20,6 +20,9 @@ use crate::models::{
 };
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
+use crate::tenant_quota::{
+    acquire_tenant_quota_guard, tenant_collection_count, tenant_point_count,
+};
 
 const HARD_MAX_POINTS_PER_COLLECTION: usize = 1_000_000;
 
@@ -42,6 +45,7 @@ pub(crate) async fn create_collection(
     let collection = Collection::new(name.clone(), config).map_err(map_collection_error)?;
     let handle = std::sync::Arc::new(std::sync::RwLock::new(collection));
 
+    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
     let collection_guard = collection_write_lock(&state, &name)?
         .acquire_owned()
         .await
@@ -56,6 +60,15 @@ pub(crate) async fn create_collection(
         if collections.contains_key(&name) {
             return Err(ApiError::conflict(format!(
                 "collection '{name}' already exists"
+            )));
+        }
+    }
+    if state.auth_config.tenant_max_collections > 0 {
+        let tenant_collections = tenant_collection_count(&state, &tenant)?;
+        if tenant_collections >= state.auth_config.tenant_max_collections as usize {
+            return Err(ApiError::resource_exhausted(format!(
+                "tenant collection limit exceeded ({})",
+                state.auth_config.tenant_max_collections
             )));
         }
     }
@@ -195,6 +208,7 @@ pub(crate) async fn upsert_point(
 ) -> Result<Json<UpsertPointResponse>, ApiError> {
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
+    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
     let _collection_guard = existing_collection_write_lock(&state, &name)?
         .acquire_owned()
         .await
@@ -205,7 +219,7 @@ pub(crate) async fn upsert_point(
     let payload_values = payload.payload;
     let wal_values = values.clone();
     let wal_payload = payload_values.clone();
-    {
+    let creating_point = {
         let collection = handle
             .read()
             .map_err(|_| ApiError::internal("collection lock poisoned"))?;
@@ -215,10 +229,20 @@ pub(crate) async fn upsert_point(
             collection.dimension(),
             collection.strict_finite(),
         )?;
-        if collection.get_point(id).is_none() && collection.len() >= HARD_MAX_POINTS_PER_COLLECTION
-        {
+        let creating_point = collection.get_point(id).is_none();
+        if creating_point && collection.len() >= HARD_MAX_POINTS_PER_COLLECTION {
             return Err(ApiError::resource_exhausted(format!(
                 "collection point limit exceeded ({HARD_MAX_POINTS_PER_COLLECTION})"
+            )));
+        }
+        creating_point
+    };
+    if creating_point && state.auth_config.tenant_max_points > 0 {
+        let tenant_points = tenant_point_count(&state, &tenant)?;
+        if tenant_points >= state.auth_config.tenant_max_points as usize {
+            return Err(ApiError::resource_exhausted(format!(
+                "tenant point limit exceeded ({})",
+                state.auth_config.tenant_max_points
             )));
         }
     }

@@ -57,6 +57,7 @@ pub(crate) struct AppState {
     pub(crate) collection_write_locks: Arc<Mutex<BTreeMap<String, Arc<Semaphore>>>>,
     pub(crate) l2_index_building: Arc<RwLock<BTreeSet<String>>>,
     pub(crate) tenant_rate_windows: Arc<Mutex<BTreeMap<String, TenantRateWindow>>>,
+    pub(crate) tenant_quota_locks: Arc<Mutex<BTreeMap<String, Arc<Semaphore>>>>,
     pub(crate) collections: Arc<RwLock<CollectionRegistry>>,
     pub(crate) l2_indexes: Arc<RwLock<BTreeMap<String, IvfIndex>>>,
 }
@@ -95,6 +96,7 @@ impl AppState {
             collection_write_locks: Arc::new(Mutex::new(collection_write_locks)),
             l2_index_building: Arc::new(RwLock::new(BTreeSet::new())),
             tenant_rate_windows: Arc::new(Mutex::new(BTreeMap::new())),
+            tenant_quota_locks: Arc::new(Mutex::new(BTreeMap::new())),
             collections: Arc::new(RwLock::new(collections)),
             l2_indexes: Arc::new(RwLock::new(BTreeMap::new())),
         }

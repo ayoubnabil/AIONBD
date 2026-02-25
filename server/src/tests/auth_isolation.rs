@@ -33,6 +33,8 @@ fn auth_state() -> AppState {
         ]),
         bearer_token_to_tenant: BTreeMap::new(),
         rate_limit_per_minute: 0,
+        tenant_max_collections: 0,
+        tenant_max_points: 0,
     };
     AppState::with_collections_and_auth(config, BTreeMap::new(), auth_config)
 }
