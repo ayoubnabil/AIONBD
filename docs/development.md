@@ -63,11 +63,19 @@ AIONBD_BENCH_SCENARIO=search_quality cargo run --release -p aionbd-bench
 - `AIONBD_PERSISTENCE_ENABLED` (default: `true`)
 - `AIONBD_SNAPSHOT_PATH` (default: `data/aionbd_snapshot.json`)
 - `AIONBD_WAL_PATH` (default: `data/aionbd_wal.jsonl`)
+- `AIONBD_AUTH_MODE` (default: `disabled`)
+- `AIONBD_AUTH_API_KEYS` (default: empty, format `<tenant>:<api_key>[,...]`)
+- `AIONBD_AUTH_BEARER_TOKENS` (default: empty, format `<tenant>:<token>[,...]`)
+- `AIONBD_AUTH_RATE_LIMIT_PER_MINUTE` (default: `0`, disabled when `0`)
+- `AIONBD_AUTH_TENANT_MAX_COLLECTIONS` (default: `0`, disabled when `0`)
+- `AIONBD_AUTH_TENANT_MAX_POINTS` (default: `0`, disabled when `0`)
 
 ## API endpoints
 
 - `GET /live`: liveness endpoint
 - `GET /ready`: readiness endpoint
+- `GET /metrics`: JSON metrics payload (SLO/ops)
+- `GET /metrics/prometheus`: Prometheus text format
 - `POST /distance`: vector operation endpoint with input validation
 - `POST /collections`: create collection `{name, dimension, strict_finite}`
 - `GET /collections`: list collections
