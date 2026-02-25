@@ -33,6 +33,7 @@ run_python_checks() {
 run_ops_checks() {
   ./scripts/check_file_sizes.sh
   python3 scripts/check_alert_runbook_sync.py
+  python3 scripts/check_backup_restore_smoke.py
 }
 
 run_rust_fast_checks() {
@@ -89,7 +90,7 @@ for file in "${!changed_map[@]}"; do
     sdk/python/*)
       python_changed=1
       ;;
-    docs/*|ops/*|scripts/check_file_sizes.sh|scripts/check_alert_runbook_sync.py|scripts/verify_local.sh)
+    docs/*|ops/*|scripts/check_file_sizes.sh|scripts/check_alert_runbook_sync.py|scripts/check_backup_restore_smoke.py|scripts/state_backup_restore.py|scripts/verify_local.sh)
       ops_changed=1
       ;;
   esac

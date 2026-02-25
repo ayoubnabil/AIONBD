@@ -152,6 +152,30 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - Prometheus alert rules: `ops/prometheus/aionbd-alerts.yml`
 - Grafana dashboard: `ops/grafana/aionbd-overview.json`
 
+## Backup and restore
+
+Create a persistence backup archive (`snapshot`, `wal`, and incremental segments):
+```bash
+python3 scripts/state_backup_restore.py backup \
+  --snapshot-path data/aionbd_snapshot.json \
+  --wal-path data/aionbd_wal.jsonl \
+  --output backups/aionbd-backup.tar.gz
+```
+
+Restore from an archive (use `--force` only when overwrite is intended):
+```bash
+python3 scripts/state_backup_restore.py restore \
+  --input backups/aionbd-backup.tar.gz \
+  --snapshot-path data/aionbd_snapshot.json \
+  --wal-path data/aionbd_wal.jsonl \
+  --force
+```
+
+Ops smoke check for backup/restore tooling:
+```bash
+python3 scripts/check_backup_restore_smoke.py
+```
+
 ## Python SDK commands
 
 From `sdk/python/`:
