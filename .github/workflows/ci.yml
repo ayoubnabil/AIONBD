@@ -36,6 +36,13 @@ jobs:
         with:
           python-version: "3.11"
       - name: Search quality benchmark pipeline
+        env:
+          AIONBD_BENCH_MIN_RECALL_IVF: "0.90"
+          AIONBD_BENCH_MIN_RECALL_AUTO: "0.90"
+          AIONBD_BENCH_MAX_P95_RATIO_IVF: "1.00"
+          AIONBD_BENCH_MAX_P95_RATIO_AUTO: "1.00"
+          AIONBD_BENCH_MAX_MEMORY_RATIO_IVF: "1.50"
+          AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO: "1.50"
         run: ./scripts/verify_bench.sh
       - name: Upload search quality report
         uses: actions/upload-artifact@v4

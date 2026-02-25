@@ -156,6 +156,65 @@ def validate_recall_thresholds(rows: list[BenchRow]) -> list[str]:
     return failures
 
 
+def validate_perf_memory_thresholds(rows: list[BenchRow]) -> list[str]:
+    max_p95_ratio_ivf = float(os.environ.get("AIONBD_BENCH_MAX_P95_RATIO_IVF", "inf"))
+    max_p95_ratio_auto = float(os.environ.get("AIONBD_BENCH_MAX_P95_RATIO_AUTO", "inf"))
+    max_mem_ratio_ivf = float(
+        os.environ.get("AIONBD_BENCH_MAX_MEMORY_RATIO_IVF", "inf")
+    )
+    max_mem_ratio_auto = float(
+        os.environ.get("AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO", "inf")
+    )
+
+    failures: list[str] = []
+    datasets = sorted({row.dataset for row in rows})
+    for dataset in datasets:
+        dataset_rows = [row for row in rows if row.dataset == dataset]
+        exact = next((row for row in dataset_rows if row.mode == "exact"), None)
+        if exact is None:
+            failures.append(f"dataset={dataset} mode=exact missing_exact_baseline")
+            continue
+
+        for row in dataset_rows:
+            p95_ratio = ratio_or_zero(row.p95_ms, exact.p95_ms)
+            mem_ratio = ratio_or_zero(row.memory_mb, exact.memory_mb)
+            if row.mode == "ivf":
+                if p95_ratio > max_p95_ratio_ivf:
+                    failures.append(
+                        "dataset={dataset} mode=ivf p95_ratio={ratio:.6f} > max={max_ratio:.6f}".format(
+                            dataset=dataset,
+                            ratio=p95_ratio,
+                            max_ratio=max_p95_ratio_ivf,
+                        )
+                    )
+                if mem_ratio > max_mem_ratio_ivf:
+                    failures.append(
+                        "dataset={dataset} mode=ivf memory_ratio={ratio:.6f} > max={max_ratio:.6f}".format(
+                            dataset=dataset,
+                            ratio=mem_ratio,
+                            max_ratio=max_mem_ratio_ivf,
+                        )
+                    )
+            if row.mode == "auto":
+                if p95_ratio > max_p95_ratio_auto:
+                    failures.append(
+                        "dataset={dataset} mode=auto p95_ratio={ratio:.6f} > max={max_ratio:.6f}".format(
+                            dataset=dataset,
+                            ratio=p95_ratio,
+                            max_ratio=max_p95_ratio_auto,
+                        )
+                    )
+                if mem_ratio > max_mem_ratio_auto:
+                    failures.append(
+                        "dataset={dataset} mode=auto memory_ratio={ratio:.6f} > max={max_ratio:.6f}".format(
+                            dataset=dataset,
+                            ratio=mem_ratio,
+                            max_ratio=max_mem_ratio_auto,
+                        )
+                    )
+    return failures
+
+
 def json_report_payload(rows: list[BenchRow], generated_at: str) -> dict[str, object]:
     return {
         "generated_at_utc": generated_at,
@@ -196,9 +255,10 @@ def main() -> int:
         return 1
 
     failures = validate_recall_thresholds(rows)
+    failures.extend(validate_perf_memory_thresholds(rows))
     if failures:
         for failure in failures:
-            print(f"error=recall_threshold_failed {failure}", file=sys.stderr)
+            print(f"error=benchmark_threshold_failed {failure}", file=sys.stderr)
         return 1
 
     markdown_path = Path(

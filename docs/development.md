@@ -55,16 +55,28 @@ Search quality benchmark pipeline (publishes dataset comparison tables + JSON):
 ./scripts/verify_bench.sh
 ```
 
-Optional quality gates for recall targets:
+Optional quality gates for recall/perf/memory targets:
 ```bash
 AIONBD_BENCH_MIN_RECALL_IVF=0.80 \
 AIONBD_BENCH_MIN_RECALL_AUTO=0.95 \
+AIONBD_BENCH_MAX_P95_RATIO_IVF=1.00 \
+AIONBD_BENCH_MAX_P95_RATIO_AUTO=1.00 \
+AIONBD_BENCH_MAX_MEMORY_RATIO_IVF=1.50 \
+AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO=1.50 \
 ./scripts/verify_bench.sh
 ```
 
 Optional report output paths:
 - `AIONBD_BENCH_REPORT_PATH` (default: `bench/reports/search_quality_report.md`)
 - `AIONBD_BENCH_REPORT_JSON_PATH` (default: `bench/reports/search_quality_report.json`)
+
+Default benchmark gates used by `./scripts/verify_bench.sh`:
+- `AIONBD_BENCH_MIN_RECALL_IVF=0.90`
+- `AIONBD_BENCH_MIN_RECALL_AUTO=0.90`
+- `AIONBD_BENCH_MAX_P95_RATIO_IVF=1.00`
+- `AIONBD_BENCH_MAX_P95_RATIO_AUTO=1.00`
+- `AIONBD_BENCH_MAX_MEMORY_RATIO_IVF=1.50`
+- `AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO=1.50`
 
 ## Server runtime configuration
 
