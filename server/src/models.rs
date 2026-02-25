@@ -104,6 +104,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) persistence_checkpoint_degraded_total: u64,
     pub(crate) persistence_checkpoint_success_total: u64,
     pub(crate) persistence_checkpoint_error_total: u64,
+    pub(crate) persistence_checkpoint_schedule_skips_total: u64,
     pub(crate) persistence_wal_size_bytes: u64,
     pub(crate) persistence_wal_tail_open: bool,
     pub(crate) persistence_incremental_segments: u64,

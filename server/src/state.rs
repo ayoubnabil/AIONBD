@@ -51,6 +51,7 @@ pub(crate) struct MetricsState {
     pub(crate) persistence_checkpoint_degraded_total: AtomicU64,
     pub(crate) persistence_checkpoint_success_total: AtomicU64,
     pub(crate) persistence_checkpoint_error_total: AtomicU64,
+    pub(crate) persistence_checkpoint_schedule_skips_total: AtomicU64,
 }
 
 #[derive(Clone)]

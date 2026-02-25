@@ -51,7 +51,12 @@ pub(crate) async fn persist_change_if_enabled(
         + 1;
     if is_checkpoint_due(writes_since_start, state.config.checkpoint_interval) {
         if configured_async_checkpoints() {
-            schedule_checkpoint_if_needed(state);
+            if !schedule_checkpoint_if_needed(state) {
+                let _ = state
+                    .metrics
+                    .persistence_checkpoint_schedule_skips_total
+                    .fetch_add(1, Ordering::Relaxed);
+            }
         } else {
             run_checkpoint(state.clone()).await;
         }
@@ -87,13 +92,13 @@ fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {
     }
 }
 
-fn schedule_checkpoint_if_needed(state: &AppState) {
+fn schedule_checkpoint_if_needed(state: &AppState) -> bool {
     if state
         .persistence_checkpoint_in_flight
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
         .is_err()
     {
-        return;
+        return false;
     }
 
     let state = state.clone();
@@ -103,6 +108,7 @@ fn schedule_checkpoint_if_needed(state: &AppState) {
             .persistence_checkpoint_in_flight
             .store(false, Ordering::Release);
     });
+    true
 }
 
 pub(crate) fn configured_async_checkpoints() -> bool {

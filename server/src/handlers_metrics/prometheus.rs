@@ -134,6 +134,9 @@ aionbd_persistence_checkpoint_success_total {}\n\
 # HELP aionbd_persistence_checkpoint_error_total Total checkpoint attempts that failed with an internal error.\n\
 # TYPE aionbd_persistence_checkpoint_error_total counter\n\
 aionbd_persistence_checkpoint_error_total {}\n\
+# HELP aionbd_persistence_checkpoint_schedule_skips_total Total due checkpoints skipped because another checkpoint was already in flight.\n\
+# TYPE aionbd_persistence_checkpoint_schedule_skips_total counter\n\
+aionbd_persistence_checkpoint_schedule_skips_total {}\n\
 # HELP aionbd_persistence_wal_size_bytes Current WAL file size in bytes.\n\
 # TYPE aionbd_persistence_wal_size_bytes gauge\n\
 aionbd_persistence_wal_size_bytes {}\n\
@@ -202,6 +205,7 @@ aionbd_max_points_per_collection {}\n",
         metrics.persistence_checkpoint_degraded_total,
         metrics.persistence_checkpoint_success_total,
         metrics.persistence_checkpoint_error_total,
+        metrics.persistence_checkpoint_schedule_skips_total,
         metrics.persistence_wal_size_bytes,
         bool_as_u8(metrics.persistence_wal_tail_open),
         metrics.persistence_incremental_segments,
