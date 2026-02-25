@@ -107,6 +107,9 @@ aionbd_persistence_enabled {}\n\
 # HELP aionbd_persistence_wal_sync_on_write WAL fsync-on-write flag (1 enabled, 0 disabled).\n\
 # TYPE aionbd_persistence_wal_sync_on_write gauge\n\
 aionbd_persistence_wal_sync_on_write {}\n\
+# HELP aionbd_persistence_wal_sync_every_n_writes Periodic WAL fsync cadence when sync-on-write is disabled (0 means never).\n\
+# TYPE aionbd_persistence_wal_sync_every_n_writes gauge\n\
+aionbd_persistence_wal_sync_every_n_writes {}\n\
 # HELP aionbd_persistence_writes Successful persisted writes since startup.\n\
 # TYPE aionbd_persistence_writes counter\n\
 aionbd_persistence_writes {}\n\
@@ -181,6 +184,7 @@ aionbd_max_points_per_collection {}\n",
         metrics.tenant_quota_point_rejections_total,
         bool_as_u8(metrics.persistence_enabled),
         bool_as_u8(metrics.persistence_wal_sync_on_write),
+        metrics.persistence_wal_sync_every_n_writes,
         metrics.persistence_writes,
         bool_as_u8(metrics.persistence_checkpoint_in_flight),
         metrics.persistence_checkpoint_degraded_total,

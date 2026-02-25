@@ -95,6 +95,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) tenant_quota_point_rejections_total: u64,
     pub(crate) persistence_enabled: bool,
     pub(crate) persistence_wal_sync_on_write: bool,
+    pub(crate) persistence_wal_sync_every_n_writes: u64,
     pub(crate) persistence_writes: u64,
     pub(crate) persistence_checkpoint_in_flight: bool,
     pub(crate) persistence_checkpoint_degraded_total: u64,

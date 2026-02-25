@@ -92,6 +92,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_CHECKPOINT_INTERVAL` (default: `32`)
 - `AIONBD_PERSISTENCE_ENABLED` (default: `true`)
 - `AIONBD_WAL_SYNC_ON_WRITE` (default: `true`; set `false` only for throughput-over-durability tradeoff)
+- `AIONBD_WAL_SYNC_EVERY_N_WRITES` (default: `0`; when `AIONBD_WAL_SYNC_ON_WRITE=false`, force fsync every N writes)
 - `AIONBD_ASYNC_CHECKPOINTS` (default: `false`; set `true` to run periodic checkpointing off the write request path)
 - `AIONBD_SNAPSHOT_PATH` (default: `data/aionbd_snapshot.json`)
 - `AIONBD_WAL_PATH` (default: `data/aionbd_wal.jsonl`)

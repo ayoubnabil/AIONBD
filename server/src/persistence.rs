@@ -1,4 +1,4 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -14,6 +14,7 @@ use crate::state::AppState;
 
 const CHECKPOINT_COMPACT_AFTER: usize = 64;
 const ASYNC_CHECKPOINTS_DEFAULT: bool = false;
+const WAL_SYNC_EVERY_N_DEFAULT: u64 = 0;
 
 pub(crate) async fn persist_change_if_enabled(
     state: &AppState,
@@ -27,8 +28,13 @@ pub(crate) async fn persist_change_if_enabled(
     let wal_path = state.config.wal_path.clone();
     let wal_record = record.clone();
     let sync_on_write = state.config.wal_sync_on_write;
+    let sync_every_n_writes = configured_wal_sync_every_n_writes();
     if let Err(error) = run_serialized_persistence_io(state, move || {
-        append_wal_record_with_sync(&wal_path, &wal_record, sync_on_write)
+        append_wal_record_with_sync(
+            &wal_path,
+            &wal_record,
+            should_sync_this_write(sync_on_write, sync_every_n_writes, next_wal_sync_sequence()),
+        )
     })
     .await
     {
@@ -120,6 +126,42 @@ fn configured_async_checkpoints() -> bool {
     })
 }
 
+pub(crate) fn configured_wal_sync_every_n_writes() -> u64 {
+    static EVERY_N_WRITES: OnceLock<u64> = OnceLock::new();
+    *EVERY_N_WRITES.get_or_init(|| {
+        let Ok(raw) = std::env::var("AIONBD_WAL_SYNC_EVERY_N_WRITES") else {
+            return WAL_SYNC_EVERY_N_DEFAULT;
+        };
+        match raw.parse::<u64>() {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!(
+                    %raw,
+                    %error,
+                    default = WAL_SYNC_EVERY_N_DEFAULT,
+                    "invalid AIONBD_WAL_SYNC_EVERY_N_WRITES; using default"
+                );
+                WAL_SYNC_EVERY_N_DEFAULT
+            }
+        }
+    })
+}
+
+fn next_wal_sync_sequence() -> u64 {
+    static WAL_WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    WAL_WRITE_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1
+}
+
+fn should_sync_this_write(sync_on_write: bool, sync_every_n_writes: u64, write_seq: u64) -> bool {
+    if sync_on_write {
+        return true;
+    }
+    if sync_every_n_writes == 0 {
+        return false;
+    }
+    write_seq.checked_rem(sync_every_n_writes) == Some(0)
+}
+
 async fn run_checkpoint(state: AppState) {
     let snapshot_path = state.config.snapshot_path.clone();
     let wal_path = state.config.wal_path.clone();
@@ -176,4 +218,24 @@ where
 
 fn is_checkpoint_due(writes_since_start: u64, checkpoint_interval: usize) -> bool {
     writes_since_start.checked_rem(checkpoint_interval as u64) == Some(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_sync_this_write;
+
+    #[test]
+    fn wal_sync_policy_prefers_explicit_sync_on_write() {
+        assert!(should_sync_this_write(true, 0, 1));
+        assert!(should_sync_this_write(true, 32, 7));
+    }
+
+    #[test]
+    fn wal_sync_policy_supports_periodic_sync_when_disabled() {
+        assert!(!should_sync_this_write(false, 0, 1));
+        assert!(!should_sync_this_write(false, 3, 1));
+        assert!(!should_sync_this_write(false, 3, 2));
+        assert!(should_sync_this_write(false, 3, 3));
+        assert!(should_sync_this_write(false, 3, 6));
+    }
 }

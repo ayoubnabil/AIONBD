@@ -13,6 +13,7 @@ use crate::index_manager::{
     configured_l2_build_cooldown_ms, l2_build_in_flight, l2_cache_hit_ratio,
 };
 use crate::models::MetricsResponse;
+use crate::persistence::configured_wal_sync_every_n_writes;
 use crate::state::AppState;
 
 mod prometheus;
@@ -154,6 +155,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .load(Ordering::Relaxed),
         persistence_enabled: state.config.persistence_enabled,
         persistence_wal_sync_on_write: state.config.wal_sync_on_write,
+        persistence_wal_sync_every_n_writes: configured_wal_sync_every_n_writes(),
         persistence_writes: state.metrics.persistence_writes.load(Ordering::Relaxed),
         persistence_checkpoint_in_flight: state
             .persistence_checkpoint_in_flight

@@ -108,6 +108,7 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["l2_index_build_cooldown_ms"], 1_000);
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
+    assert_eq!(payload["persistence_wal_sync_every_n_writes"], 0);
     assert_eq!(payload["persistence_writes"], 0);
     assert_eq!(payload["persistence_checkpoint_in_flight"], false);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
@@ -236,6 +237,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["persistence_writes"], 9);
     assert_eq!(payload["persistence_checkpoint_in_flight"], true);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
+    assert_eq!(payload["persistence_wal_sync_every_n_writes"], 0);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);
     assert_eq!(payload["persistence_incremental_segments"], 0);
