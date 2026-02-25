@@ -85,6 +85,16 @@ pub(crate) fn run_search_quality_bench(mode: &str) -> bool {
                 row.p99_ms,
                 row.memory_bytes as f64 / (1024.0 * 1024.0)
             );
+            println!(
+                "bench=search_quality_row dataset={} mode={} recall_at_k={:.6} p50_ms={:.6} p95_ms={:.6} p99_ms={:.6} memory_bytes={}",
+                row.dataset,
+                row.mode.as_str(),
+                row.recall_at_k,
+                row.p50_ms,
+                row.p95_ms,
+                row.p99_ms,
+                row.memory_bytes
+            );
         }
     }
 

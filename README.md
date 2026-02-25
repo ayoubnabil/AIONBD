@@ -26,7 +26,12 @@ cargo run -p aionbd-server
 cargo run --release -p aionbd-bench
 ```
 
-4. Use the Python SDK:
+4. Run the search quality benchmark pipeline report:
+```bash
+./scripts/verify_bench.sh
+```
+
+5. Use the Python SDK:
 ```bash
 cd sdk/python
 python -m pip install -e .
@@ -41,6 +46,8 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`).
 - Search supports explicit modes (`exact`, `ivf`, `auto`) with target recall guarantees
   and metadata filtering (`must`/`should` + range clauses).
+- Benchmark pipeline publishes dataset comparative tables (`recall@k`, p50/p95/p99,
+  memory cost) to `bench/reports/`.
 - Point payload metadata is supported on upsert/get/search responses.
 - Persistence rotates WAL into incremental snapshots and compacts periodically to control restart cost.
 - Cached L2 IVF indexes are invalidated automatically on collection and point mutations.

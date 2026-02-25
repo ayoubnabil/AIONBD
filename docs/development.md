@@ -50,6 +50,22 @@ AIONBD_BENCH_SCENARIO=list_points cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=search_quality cargo run --release -p aionbd-bench
 ```
 
+Search quality benchmark pipeline (publishes dataset comparison tables + JSON):
+```bash
+./scripts/verify_bench.sh
+```
+
+Optional quality gates for recall targets:
+```bash
+AIONBD_BENCH_MIN_RECALL_IVF=0.80 \
+AIONBD_BENCH_MIN_RECALL_AUTO=0.95 \
+./scripts/verify_bench.sh
+```
+
+Optional report output paths:
+- `AIONBD_BENCH_REPORT_PATH` (default: `bench/reports/search_quality_report.md`)
+- `AIONBD_BENCH_REPORT_JSON_PATH` (default: `bench/reports/search_quality_report.json`)
+
 ## Server runtime configuration
 
 - `AIONBD_BIND` (default: `127.0.0.1:8080`)
