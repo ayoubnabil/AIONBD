@@ -30,6 +30,11 @@ run_python_checks() {
   python3 -m unittest discover -s sdk/python/tests -v
 }
 
+run_ops_checks() {
+  ./scripts/check_file_sizes.sh
+  python3 scripts/check_alert_runbook_sync.py
+}
+
 run_rust_fast_checks() {
   cargo fmt --all --check
   cargo clippy -p aionbd-core -p aionbd-server --all-targets -- -D warnings
@@ -45,12 +50,14 @@ run_rust_full_checks() {
 if [[ "$mode" == "full" ]]; then
   run_rust_full_checks
   run_python_checks
+  run_ops_checks
   exit 0
 fi
 
 if [[ "$mode" == "--fast" ]]; then
   run_rust_fast_checks
   run_python_checks
+  run_ops_checks
   exit 0
 fi
 
@@ -73,6 +80,7 @@ fi
 
 rust_changed=0
 python_changed=0
+ops_changed=0
 for file in "${!changed_map[@]}"; do
   case "$file" in
     *.rs|Cargo.toml|Cargo.lock)
@@ -80,6 +88,9 @@ for file in "${!changed_map[@]}"; do
       ;;
     sdk/python/*)
       python_changed=1
+      ;;
+    docs/*|ops/*|scripts/check_file_sizes.sh|scripts/check_alert_runbook_sync.py|scripts/verify_local.sh)
+      ops_changed=1
       ;;
   esac
 done
@@ -92,6 +103,10 @@ if [[ "$python_changed" -eq 1 ]]; then
   run_python_checks
 fi
 
-if [[ "$rust_changed" -eq 0 && "$python_changed" -eq 0 ]]; then
-  echo "No Rust or SDK Python changes detected; skipping code checks."
+if [[ "$ops_changed" -eq 1 ]]; then
+  run_ops_checks
+fi
+
+if [[ "$rust_changed" -eq 0 && "$python_changed" -eq 0 && "$ops_changed" -eq 0 ]]; then
+  echo "No Rust, SDK Python, or ops/runbook changes detected; skipping checks."
 fi
