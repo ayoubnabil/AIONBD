@@ -59,6 +59,8 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Incremental checkpoint compaction threshold is configurable (`AIONBD_CHECKPOINT_COMPACT_AFTER`, default `64`).
 - Ops backup/restore helpers are available via `scripts/state_backup_restore.py` (with smoke check `scripts/check_backup_restore_smoke.py`).
 - Collection export/import helpers are available via `scripts/collection_export_import.py` (with smoke check `scripts/check_collection_export_import_smoke.py`).
+- A mixed read/write soak harness is available via `scripts/run_soak_test.py` (with smoke check `scripts/check_soak_harness_smoke.py`).
+- Optional TLS termination is supported in-process via rustls (`AIONBD_TLS_ENABLED=true` with cert/key paths).
 - IVF async rebuild cooldown is configurable (`AIONBD_L2_INDEX_BUILD_COOLDOWN_MS`, default `1000`).
 - IVF async build concurrency is configurable (`AIONBD_L2_INDEX_BUILD_MAX_IN_FLIGHT`, default `2`).
 - IVF warmup at boot is configurable (`AIONBD_L2_INDEX_WARMUP_ON_BOOT`, default `true`).

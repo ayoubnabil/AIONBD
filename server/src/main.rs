@@ -53,6 +53,7 @@ mod state;
 mod tenant_quota;
 #[cfg(test)]
 mod tests;
+mod tls;
 mod write_path;
 
 use crate::auth::{auth_rate_limit_audit, AuthConfig};
@@ -70,12 +71,14 @@ use crate::http_metrics::track_http_metrics;
 use crate::index_manager::warmup_l2_indexes;
 use crate::persistence::configured_checkpoint_compact_after;
 use crate::state::AppState;
+use crate::tls::TlsRuntimeConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing();
 
     let config = AppConfig::from_env().context("invalid configuration")?;
+    let tls_config = TlsRuntimeConfig::from_env().context("invalid TLS configuration")?;
     let auth_config = AuthConfig::from_env().context("invalid authentication configuration")?;
     let initial_collections = load_initial_collections(&config)?;
     let bind = config.bind;
@@ -84,12 +87,17 @@ async fn main() -> Result<()> {
     warmup_l2_indexes(&state);
     let app = build_app(state.clone());
 
-    let listener = tokio::net::TcpListener::bind(bind)
-        .await
-        .with_context(|| format!("failed to bind server socket on {bind}"))?;
-
     tracing::info!(
         %bind,
+        tls_enabled = tls_config.enabled(),
+        tls_cert_path = tls_config
+            .cert_path()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "-".to_string()),
+        tls_key_path = tls_config
+            .key_path()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "-".to_string()),
         max_dimension = config.max_dimension,
         max_points_per_collection = config.max_points_per_collection,
         strict_finite = config.strict_finite,
@@ -106,12 +114,40 @@ async fn main() -> Result<()> {
         "aionbd server started"
     );
 
+    run_server(app, bind, &tls_config).await?;
+    checkpoint_before_exit(&state).await;
+
+    Ok(())
+}
+
+async fn run_server(
+    app: Router,
+    bind: std::net::SocketAddr,
+    tls_config: &TlsRuntimeConfig,
+) -> Result<()> {
+    if let Some(rustls_config) = tls_config.rustls_config().await? {
+        let handle = axum_server::Handle::new();
+        let shutdown_handle = handle.clone();
+        tokio::spawn(async move {
+            shutdown_signal().await;
+            shutdown_handle.graceful_shutdown(Some(Duration::from_secs(30)));
+        });
+        axum_server::bind_rustls(bind, rustls_config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await
+            .context("TLS server exited unexpectedly")?;
+        return Ok(());
+    }
+
+    let listener = tokio::net::TcpListener::bind(bind)
+        .await
+        .with_context(|| format!("failed to bind server socket on {bind}"))?;
+
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .context("server exited unexpectedly")?;
-    checkpoint_before_exit(&state).await;
-
     Ok(())
 }
 

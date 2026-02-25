@@ -90,6 +90,9 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 ## Server runtime configuration
 
 - `AIONBD_BIND` (default: `127.0.0.1:8080`)
+- `AIONBD_TLS_ENABLED` (default: `false`; when `true`, serve HTTPS using rustls)
+- `AIONBD_TLS_CERT_PATH` (required when TLS enabled; PEM certificate chain file)
+- `AIONBD_TLS_KEY_PATH` (required when TLS enabled; PEM private key file)
 - `AIONBD_MAX_DIMENSION` (default: `4096`)
 - `AIONBD_MAX_POINTS_PER_COLLECTION` (default: `1000000`, must be `> 0`)
 - `AIONBD_STRICT_FINITE` (default: `true`)
@@ -198,6 +201,27 @@ python3 scripts/collection_export_import.py import \
 Offline smoke check for export/import tooling:
 ```bash
 python3 scripts/check_collection_export_import_smoke.py
+```
+
+## Soak test harness
+
+Run a mixed read/write soak scenario (example 10 minutes):
+```bash
+python3 scripts/run_soak_test.py \
+  --base-url http://127.0.0.1:8080 \
+  --collection soak \
+  --dimension 256 \
+  --duration-seconds 600 \
+  --workers 8 \
+  --write-ratio 0.2 \
+  --metric l2 \
+  --search-mode auto \
+  --report-json bench/reports/soak_report.json
+```
+
+Fast harness smoke check (no server required):
+```bash
+python3 scripts/check_soak_harness_smoke.py
 ```
 
 ## Python SDK commands
