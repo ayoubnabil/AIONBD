@@ -19,6 +19,7 @@ mod list_points_offset;
 mod metrics;
 mod metrics_prometheus;
 mod persistence;
+mod persistence_chaos;
 mod persistence_degraded;
 mod persistence_rollbacks;
 mod search;
