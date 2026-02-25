@@ -56,7 +56,7 @@ mod tests;
 mod tls;
 mod write_path;
 
-use crate::auth::{auth_rate_limit_audit, AuthConfig};
+use crate::auth::{auth_rate_limit_audit, AuthConfig, AuthMode};
 use crate::config::AppConfig;
 use crate::engine_guard::require_engine_loaded;
 use crate::errors::handle_middleware_error;
@@ -82,6 +82,18 @@ async fn main() -> Result<()> {
     let auth_config = AuthConfig::from_env().context("invalid authentication configuration")?;
     let initial_collections = load_initial_collections(&config)?;
     let bind = config.bind;
+    if !bind.ip().is_loopback() && auth_config.mode == AuthMode::Disabled {
+        tracing::warn!(
+            %bind,
+            "authentication is disabled while listening on a non-loopback address"
+        );
+    }
+    if !bind.ip().is_loopback() && !tls_config.enabled() {
+        tracing::warn!(
+            %bind,
+            "TLS is disabled while listening on a non-loopback address"
+        );
+    }
     let state =
         AppState::with_collections_and_auth(config.clone(), initial_collections, auth_config);
     warmup_l2_indexes(&state);
