@@ -9,8 +9,7 @@ use crate::errors::{map_collection_error, map_json_rejection, ApiError};
 use crate::handler_utils::{
     build_collection_response, canonical_collection_name, collection_handle,
     collection_handle_by_name, collection_write_lock, existing_collection_write_lock,
-    remove_collection_write_lock, scoped_collection_name, validate_upsert_input,
-    visible_collection_name,
+    remove_collection_write_lock, scoped_collection_name, visible_collection_name,
 };
 pub(crate) use crate::handlers_health::{distance, live, ready};
 use crate::index_manager::remove_l2_index_entry;
@@ -23,6 +22,7 @@ use crate::state::AppState;
 use crate::tenant_quota::{
     acquire_tenant_quota_guard, tenant_collection_count, tenant_point_count,
 };
+use crate::write_path::{apply_upsert, precheck_upsert};
 
 const HARD_MAX_POINTS_PER_COLLECTION: usize = 1_000_000;
 
@@ -231,25 +231,14 @@ pub(crate) async fn upsert_point(
     let payload_values = payload.payload;
     let wal_values = values.clone();
     let wal_payload = payload_values.clone();
-    let creating_point = {
-        let collection = handle
-            .read()
-            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-        validate_upsert_input(
-            &values,
-            &payload_values,
-            collection.dimension(),
-            collection.strict_finite(),
-        )?;
-        let creating_point = collection.get_point(id).is_none();
-        if creating_point && collection.len() >= HARD_MAX_POINTS_PER_COLLECTION {
-            return Err(ApiError::resource_exhausted(format!(
-                "collection point limit exceeded ({HARD_MAX_POINTS_PER_COLLECTION})"
-            )));
-        }
-        creating_point
-    };
-    if creating_point && state.auth_config.tenant_max_points > 0 {
+    let precheck =
+        precheck_upsert(handle.clone(), id, values.clone(), payload_values.clone()).await?;
+    if precheck.creating_point && precheck.point_count >= HARD_MAX_POINTS_PER_COLLECTION {
+        return Err(ApiError::resource_exhausted(format!(
+            "collection point limit exceeded ({HARD_MAX_POINTS_PER_COLLECTION})"
+        )));
+    }
+    if precheck.creating_point && state.auth_config.tenant_max_points > 0 {
         let tenant_points = tenant_point_count(&state, &tenant)?;
         if tenant_points >= state.auth_config.tenant_max_points as usize {
             let _ = state
@@ -274,15 +263,13 @@ pub(crate) async fn upsert_point(
     )
     .await?;
 
-    let created = handle
-        .write()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?
-        .upsert_point_with_payload(id, values, payload_values)
+    let created = apply_upsert(handle, id, values, payload_values)
+        .await
         .map_err(|error| {
             state
                 .engine_loaded
                 .store(false, std::sync::atomic::Ordering::Relaxed);
-            tracing::error!(collection = %name, point_id = id, %error, "in-memory upsert failed after wal append");
+            tracing::error!(collection = %name, point_id = id, ?error, "in-memory upsert failed after wal append");
             ApiError::internal("in-memory state update failed after wal append; restart required")
         })?;
     remove_l2_index_entry(&state, &name);

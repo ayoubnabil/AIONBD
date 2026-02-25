@@ -17,6 +17,7 @@ use crate::models::{
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 use crate::tenant_quota::acquire_tenant_quota_guard;
+use crate::write_path::{apply_delete, ensure_point_exists};
 
 const MAX_OFFSET_SCAN: usize = 100_000;
 
@@ -137,14 +138,7 @@ pub(crate) async fn delete_point(
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
     let handle = collection_handle_by_name(&state, &name)?;
 
-    {
-        let collection = handle
-            .read()
-            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-        if collection.get_point(id).is_none() {
-            return Err(ApiError::not_found(format!("point '{id}' not found")));
-        }
-    }
+    ensure_point_exists(handle.clone(), id).await?;
 
     persist_change_if_enabled(
         &state,
@@ -155,11 +149,7 @@ pub(crate) async fn delete_point(
     )
     .await?;
 
-    let deleted = handle
-        .write()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?
-        .remove_point(id)
-        .is_some();
+    let deleted = apply_delete(handle, id).await?;
     if !deleted {
         state
             .engine_loaded

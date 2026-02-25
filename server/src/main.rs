@@ -52,6 +52,7 @@ mod state;
 mod tenant_quota;
 #[cfg(test)]
 mod tests;
+mod write_path;
 
 use crate::auth::{auth_rate_limit_audit, AuthConfig};
 use crate::config::AppConfig;
