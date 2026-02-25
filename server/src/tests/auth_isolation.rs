@@ -167,6 +167,70 @@ async fn tenants_are_scoped_per_resource_name() {
 }
 
 #[tokio::test]
+async fn tenant_cannot_access_other_tenant_collection_routes() {
+    let app = build_app(auth_state());
+
+    let create = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "POST",
+            "/collections",
+            Some("key-a"),
+            Some(json!({"name":"private","dimension":3})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(create.status(), StatusCode::OK);
+
+    let upsert = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "PUT",
+            "/collections/private/points/1",
+            Some("key-a"),
+            Some(json!({"values":[1.0,2.0,3.0]})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(upsert.status(), StatusCode::OK);
+
+    let list_points = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "GET",
+            "/collections/private/points",
+            Some("key-b"),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(list_points.status(), StatusCode::NOT_FOUND);
+
+    let search = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "POST",
+            "/collections/private/search/topk",
+            Some("key-b"),
+            Some(json!({"query":[1.0,2.0,3.0],"metric":"l2","limit":1})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(search.status(), StatusCode::NOT_FOUND);
+
+    let get = app
+        .oneshot(request_with_api_key(
+            "GET",
+            "/collections/private",
+            Some("key-b"),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(get.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn rate_limit_windows_are_pruned() {
     let mut state = auth_state();
     let mut auth_config = (*state.auth_config).clone();

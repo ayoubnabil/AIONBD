@@ -209,3 +209,69 @@ async fn jwt_tenants_are_scoped_per_resource_name() {
         .expect("response expected");
     assert_eq!(get_b.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn jwt_tenant_cannot_access_other_tenant_collection_routes() {
+    let app = build_app(jwt_state());
+    let tenant_a = jwt_for_tenant("tenant_a", "alice", 3600);
+    let tenant_b = jwt_for_tenant("tenant_b", "bob", 3600);
+
+    let create = app
+        .clone()
+        .oneshot(request_with_token(
+            "POST",
+            "/collections",
+            Some(&tenant_a),
+            Some(json!({"name":"private","dimension":3})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(create.status(), StatusCode::OK);
+
+    let upsert = app
+        .clone()
+        .oneshot(request_with_token(
+            "PUT",
+            "/collections/private/points/1",
+            Some(&tenant_a),
+            Some(json!({"values":[1.0,2.0,3.0]})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(upsert.status(), StatusCode::OK);
+
+    let list_points = app
+        .clone()
+        .oneshot(request_with_token(
+            "GET",
+            "/collections/private/points",
+            Some(&tenant_b),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(list_points.status(), StatusCode::NOT_FOUND);
+
+    let search = app
+        .clone()
+        .oneshot(request_with_token(
+            "POST",
+            "/collections/private/search/topk",
+            Some(&tenant_b),
+            Some(json!({"query":[1.0,2.0,3.0],"metric":"l2","limit":1})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(search.status(), StatusCode::NOT_FOUND);
+
+    let get = app
+        .oneshot(request_with_token(
+            "GET",
+            "/collections/private",
+            Some(&tenant_b),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(get.status(), StatusCode::NOT_FOUND);
+}

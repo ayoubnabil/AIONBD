@@ -5,9 +5,7 @@ use tokio::task;
 
 use crate::auth::TenantContext;
 use crate::errors::ApiError;
-use crate::handler_utils::{
-    collection_handle, existing_collection_write_lock, scoped_collection_name,
-};
+use crate::handler_utils::{existing_collection_write_lock, scoped_collection_name};
 use crate::models::{
     DeletePointResponse, ListPointsQuery, ListPointsResponse, PointIdResponse, PointResponse,
     DEFAULT_PAGE_LIMIT,
@@ -15,7 +13,9 @@ use crate::models::{
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 use crate::tenant_quota::acquire_tenant_quota_guard;
-use crate::write_path::{apply_delete, ensure_point_exists, load_collection_handle};
+use crate::write_path::{
+    apply_delete, ensure_point_exists, load_collection_handle, load_tenant_collection_handle,
+};
 
 const MAX_OFFSET_SCAN: usize = 100_000;
 
@@ -48,22 +48,21 @@ pub(crate) async fn list_points(
     }
     let limit = requested_limit.min(max_page_limit);
 
-    let state_for_list = state.clone();
-    let tenant_for_list = tenant.clone();
-    let name_for_list = name.clone();
+    let (_, handle) = load_tenant_collection_handle(state.clone(), name, tenant).await?;
+    let offset = query.offset;
+    let after_id = query.after_id;
     let (total, ids, next_offset, next_after_id) = task::spawn_blocking(move || {
-        let (_, collection) = collection_handle(&state_for_list, &name_for_list, &tenant_for_list)?;
-        let collection = collection
+        let collection = handle
             .read()
             .map_err(|_| ApiError::internal("collection lock poisoned"))?;
 
         let total = collection.len();
-        let (ids, next_offset, next_after_id) = if let Some(after_id) = query.after_id {
+        let (ids, next_offset, next_after_id) = if let Some(after_id) = after_id {
             let (ids, next_after_id) = collection.point_ids_page_after(Some(after_id), limit);
             (ids, None, next_after_id)
         } else {
-            let ids = collection.point_ids_page(query.offset, limit);
-            let consumed = query.offset.saturating_add(ids.len());
+            let ids = collection.point_ids_page(offset, limit);
+            let consumed = offset.saturating_add(ids.len());
             let next_offset = if consumed < total {
                 Some(consumed)
             } else {
@@ -100,11 +99,8 @@ pub(crate) async fn get_point(
     State(state): State<AppState>,
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<PointResponse>, ApiError> {
-    let state_for_get = state.clone();
-    let tenant_for_get = tenant.clone();
-    let name_for_get = name.clone();
+    let (_, handle) = load_tenant_collection_handle(state, name, tenant).await?;
     let response = task::spawn_blocking(move || {
-        let (_, handle) = collection_handle(&state_for_get, &name_for_get, &tenant_for_get)?;
         let collection = handle
             .read()
             .map_err(|_| ApiError::internal("collection lock poisoned"))?;

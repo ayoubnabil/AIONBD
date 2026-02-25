@@ -1,7 +1,8 @@
 use tokio::task;
 
+use crate::auth::TenantContext;
 use crate::errors::ApiError;
-use crate::handler_utils::validate_upsert_input;
+use crate::handler_utils::{scoped_collection_name, validate_upsert_input};
 use crate::models::PointPayload;
 use crate::state::{AppState, CollectionHandle};
 
@@ -65,6 +66,16 @@ pub(crate) async fn load_collection_handle(
             .ok_or_else(|| ApiError::not_found(format!("collection '{canonical_name}' not found")))
     })
     .await
+}
+
+pub(crate) async fn load_tenant_collection_handle(
+    state: AppState,
+    raw_name: String,
+    tenant: TenantContext,
+) -> Result<(String, CollectionHandle), ApiError> {
+    let canonical_name = scoped_collection_name(&state, &raw_name, &tenant)?;
+    let handle = load_collection_handle(state, canonical_name.clone()).await?;
+    Ok((canonical_name, handle))
 }
 
 pub(crate) async fn collection_exists(
