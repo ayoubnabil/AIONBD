@@ -255,6 +255,7 @@ Wrapper for soak pipeline runs:
 ```bash
 ./scripts/verify_soak.sh
 AIONBD_SOAK_DRY_RUN=1 ./scripts/verify_soak.sh
+AIONBD_SOAK_DRY_RUN=1 ./scripts/verify_soak.sh --profiles-file ops/soak/longrun_profiles.json
 ```
 
 ## Python SDK commands

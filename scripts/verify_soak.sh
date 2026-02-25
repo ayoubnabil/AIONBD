@@ -9,4 +9,4 @@ if [[ "${AIONBD_SOAK_DRY_RUN:-0}" == "1" ]]; then
   args+=(--dry-run)
 fi
 
-python3 scripts/run_soak_pipeline.py "${args[@]}"
+python3 scripts/run_soak_pipeline.py "${args[@]}" "$@"

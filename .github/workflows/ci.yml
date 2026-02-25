@@ -66,7 +66,7 @@ jobs:
           AIONBD_SOAK_DRY_RUN: "1"
           AIONBD_SOAK_REPORT_PATH: "bench/reports/soak_pipeline_report.md"
           AIONBD_SOAK_REPORT_JSON_PATH: "bench/reports/soak_pipeline_report.json"
-        run: ./scripts/verify_soak.sh
+        run: ./scripts/verify_soak.sh --profiles-file ops/soak/longrun_profiles.json
       - name: Upload soak pipeline report
         uses: actions/upload-artifact@v4
         with:
