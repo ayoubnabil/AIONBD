@@ -203,6 +203,21 @@
           "expr": "aionbd_l2_indexes",
           "legendFormat": "l2_indexes",
           "refId": "C"
+        },
+        {
+          "expr": "aionbd_collection_write_lock_entries",
+          "legendFormat": "collection_write_lock_entries",
+          "refId": "D"
+        },
+        {
+          "expr": "aionbd_tenant_rate_window_entries",
+          "legendFormat": "tenant_rate_window_entries",
+          "refId": "E"
+        },
+        {
+          "expr": "aionbd_tenant_quota_lock_entries",
+          "legendFormat": "tenant_quota_lock_entries",
+          "refId": "F"
         }
       ]
     },

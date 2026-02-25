@@ -64,6 +64,9 @@ Create one dashboard with these panels:
    `rate(aionbd_rate_limit_rejections_total[5m])`
 9. Cardinality/load indicators:
    `aionbd_collections`, `aionbd_points`, `aionbd_l2_indexes`
+   `aionbd_collection_write_lock_entries`
+   `aionbd_tenant_rate_window_entries`
+   `aionbd_tenant_quota_lock_entries`
 10. Search execution quality:
    `rate(aionbd_search_queries_total[5m])`
    `rate(aionbd_search_ivf_queries_total[5m])`
@@ -176,6 +179,18 @@ groups:
           summary: "AIONBD tenant quota pressure"
           description: "Writes are being rejected by quota enforcement."
 
+      - alert: AionbdTenantTrackingCardinalityHigh
+        expr: |
+          aionbd_tenant_rate_window_entries > 10000
+          or
+          aionbd_tenant_quota_lock_entries > 10000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD tenant tracking cardinality is high"
+          description: "Tenant tracking maps grew beyond expected bounds; inspect abusive traffic and retention behavior."
+
       - alert: AionbdRateLimitPressure
         expr: rate(aionbd_rate_limit_rejections_total[10m]) > 0
         for: 10m
@@ -226,6 +241,11 @@ When `AionbdWalBacklogGrowing` or `AionbdIncrementalBacklogGrowing` fires:
 1. Check `aionbd_persistence_wal_size_bytes`, `aionbd_persistence_incremental_segments`, and `aionbd_persistence_incremental_size_bytes`.
 2. Correlate with `rate(aionbd_persistence_writes[5m])` and checkpoint degradation events.
 3. If growth is sustained, reduce ingest pressure and investigate checkpoint/compaction throughput.
+
+When `AionbdTenantTrackingCardinalityHigh` fires:
+1. Inspect `aionbd_tenant_rate_window_entries` and `aionbd_tenant_quota_lock_entries`.
+2. Correlate with rate-limit pressure and tenant churn.
+3. Investigate abusive credential rotation and tighten ingress controls.
 
 When `AionbdHigh5xxRatio` fires:
 1. Split by endpoint in request logs.

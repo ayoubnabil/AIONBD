@@ -80,6 +80,15 @@ aionbd_rate_limit_rejections_total {}\n\
 # HELP aionbd_audit_events_total Total emitted audit events.\n\
 # TYPE aionbd_audit_events_total counter\n\
 aionbd_audit_events_total {}\n\
+# HELP aionbd_collection_write_lock_entries Number of collection write semaphores currently tracked.\n\
+# TYPE aionbd_collection_write_lock_entries gauge\n\
+aionbd_collection_write_lock_entries {}\n\
+# HELP aionbd_tenant_rate_window_entries Number of tenant rate-limit windows currently tracked.\n\
+# TYPE aionbd_tenant_rate_window_entries gauge\n\
+aionbd_tenant_rate_window_entries {}\n\
+# HELP aionbd_tenant_quota_lock_entries Number of tenant quota semaphores currently tracked.\n\
+# TYPE aionbd_tenant_quota_lock_entries gauge\n\
+aionbd_tenant_quota_lock_entries {}\n\
 # HELP aionbd_tenant_quota_collection_rejections_total Total collection write rejections due to tenant quota.\n\
 # TYPE aionbd_tenant_quota_collection_rejections_total counter\n\
 aionbd_tenant_quota_collection_rejections_total {}\n\
@@ -148,6 +157,9 @@ aionbd_search_ivf_fallback_exact_total {}\n",
         metrics.auth_failures_total,
         metrics.rate_limit_rejections_total,
         metrics.audit_events_total,
+        metrics.collection_write_lock_entries,
+        metrics.tenant_rate_window_entries,
+        metrics.tenant_quota_lock_entries,
         metrics.tenant_quota_collection_rejections_total,
         metrics.tenant_quota_point_rejections_total,
         bool_as_u8(metrics.persistence_enabled),

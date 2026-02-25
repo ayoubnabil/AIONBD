@@ -70,6 +70,9 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
     };
     let engine_loaded = state.engine_loaded.load(Ordering::Relaxed);
     let storage_available = state.storage_available.load(Ordering::Relaxed);
+    let collection_write_lock_entries = state.collection_write_locks.blocking_lock().len();
+    let tenant_rate_window_entries = state.tenant_rate_windows.blocking_lock().len();
+    let tenant_quota_lock_entries = state.tenant_quota_locks.blocking_lock().len();
     let (
         persistence_wal_size_bytes,
         persistence_wal_tail_open,
@@ -131,6 +134,9 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .rate_limit_rejections_total
             .load(Ordering::Relaxed),
         audit_events_total: state.metrics.audit_events_total.load(Ordering::Relaxed),
+        collection_write_lock_entries,
+        tenant_rate_window_entries,
+        tenant_quota_lock_entries,
         tenant_quota_collection_rejections_total: state
             .metrics
             .tenant_quota_collection_rejections_total

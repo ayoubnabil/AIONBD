@@ -127,6 +127,18 @@ groups:
           summary: "AIONBD tenant quota pressure"
           description: "Writes are being rejected by tenant collection/point quotas."
 
+      - alert: AionbdTenantTrackingCardinalityHigh
+        expr: |
+          aionbd_tenant_rate_window_entries > 10000
+          or
+          aionbd_tenant_quota_lock_entries > 10000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD tenant tracking cardinality is high"
+          description: "Tenant tracking maps grew beyond expected bounds; inspect abusive traffic and retention behavior."
+
       - alert: AionbdIvfFallbackRatioHigh
         expr: |
           (
