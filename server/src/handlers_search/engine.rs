@@ -144,12 +144,7 @@ fn select_candidate_strategy(
     match plan.mode {
         SearchMode::Exact => Ok(CandidateStrategy::ExactScan),
         SearchMode::Ivf | SearchMode::Auto => {
-            if !matches!(plan.metric, Metric::L2) {
-                if plan.mode == SearchMode::Ivf {
-                    return Err(ApiError::invalid_argument(
-                        "mode 'ivf' is only supported with metric 'l2'",
-                    ));
-                }
+            if !matches!(plan.metric, Metric::L2) && plan.mode == SearchMode::Auto {
                 return Ok(CandidateStrategy::ExactScan);
             }
             if collection.len() < IvfIndex::min_indexed_points() {

@@ -110,39 +110,51 @@ async fn search_supports_filtering_with_metadata_payload() {
 }
 
 #[tokio::test]
-async fn search_mode_ivf_rejects_non_l2_metric() {
-    let app = build_app(test_state());
-
-    let create_req = Request::builder()
-        .method("POST")
-        .uri("/collections")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            json!({"name": "search_mode_err", "dimension": 2}).to_string(),
-        ))
-        .expect("request must build");
-    let create_resp = app
-        .clone()
-        .oneshot(create_req)
-        .await
-        .expect("response expected");
-    assert_eq!(create_resp.status(), StatusCode::OK);
+async fn search_mode_ivf_supports_non_l2_metric_with_l2_candidate_prefilter() {
+    let state = test_state();
+    let mut collection = Collection::new(
+        "search_ivf_non_l2".to_string(),
+        CollectionConfig::new(2, true).expect("config should be valid"),
+    )
+    .expect("collection should be valid");
+    for id in 0..IvfIndex::min_indexed_points() as u64 {
+        collection
+            .upsert_point(id, vec![id as f32, (id % 5) as f32])
+            .expect("upsert should succeed");
+    }
+    let index = IvfIndex::build(&collection).expect("index should be built");
+    state
+        .collections
+        .write()
+        .expect("collection registry lock should be available")
+        .insert(
+            "search_ivf_non_l2".to_string(),
+            std::sync::Arc::new(std::sync::RwLock::new(collection)),
+        );
+    state
+        .l2_indexes
+        .write()
+        .expect("l2 index cache lock should be available")
+        .insert("search_ivf_non_l2".to_string(), index);
+    let app = build_app(state);
 
     let search_req = Request::builder()
         .method("POST")
-        .uri("/collections/search_mode_err/search/topk")
+        .uri("/collections/search_ivf_non_l2/search/topk")
         .header("content-type", "application/json")
         .body(Body::from(
-            json!({"query": [1.0, 0.0], "metric": "dot", "mode": "ivf", "limit": 1}).to_string(),
+            json!({"query": [1.0, 1.0], "metric": "dot", "mode": "ivf", "limit": 20}).to_string(),
         ))
         .expect("request must build");
-    let search_resp = app
-        .clone()
-        .oneshot(search_req)
+    let search_resp = app.oneshot(search_req).await.expect("response expected");
+    assert_eq!(search_resp.status(), StatusCode::OK);
+    let search_body = axum::body::to_bytes(search_resp.into_body(), usize::MAX)
         .await
-        .expect("response expected");
+        .expect("body should be readable");
+    let search_payload: serde_json::Value =
+        serde_json::from_slice(&search_body).expect("valid json response");
 
-    assert_eq!(search_resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(search_payload["mode"], "ivf");
 }
 
 #[tokio::test]
