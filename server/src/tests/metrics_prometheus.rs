@@ -123,7 +123,11 @@ async fn metrics_prometheus_reports_text_metrics() {
 
 #[tokio::test]
 async fn metrics_prometheus_reflects_runtime_flags() {
-    let state = test_state();
+    let mut state = test_state();
+    {
+        let config = std::sync::Arc::make_mut(&mut state.config);
+        config.wal_sync_on_write = false;
+    }
     state.engine_loaded.store(false, Ordering::Relaxed);
     state.storage_available.store(false, Ordering::Relaxed);
     state
@@ -193,7 +197,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_ready 0"));
     assert!(payload.contains("aionbd_engine_loaded 0"));
     assert!(payload.contains("aionbd_storage_available 0"));
-    assert!(payload.contains("aionbd_persistence_wal_sync_on_write 1"));
+    assert!(payload.contains("aionbd_persistence_wal_sync_on_write 0"));
     assert!(payload.contains("aionbd_persistence_writes 12"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));

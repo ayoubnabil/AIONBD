@@ -28,6 +28,7 @@ mod persistence_chaos;
 mod persistence_degraded;
 mod persistence_metrics;
 mod persistence_rollbacks;
+mod persistence_sync_mode;
 mod runtime_maps_metrics;
 mod search;
 mod search_advanced;
