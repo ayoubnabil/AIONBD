@@ -47,6 +47,7 @@ AIONBD_BENCH_SCENARIO=dot cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=l2 cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=list_points cargo run --release -p aionbd-bench
+AIONBD_BENCH_SCENARIO=persistence_write cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=search_quality cargo run --release -p aionbd-bench
 ```
 

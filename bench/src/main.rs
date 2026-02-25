@@ -6,10 +6,13 @@ use std::process;
 
 use core_scan_bench::{run_collection_bench, run_dot_bench, run_l2_bench};
 use list_points_bench::run_list_points_bench;
+use persistence_write_bench::run_persistence_write_bench;
 use search_quality_bench::run_search_quality_bench;
 
 mod core_scan_bench;
 mod list_points_bench;
+mod persistence_write_bench;
+mod persistence_write_utils;
 mod search_quality_bench;
 mod search_quality_ivf;
 
@@ -34,16 +37,18 @@ fn main() {
                 && run_l2_bench(mode)
                 && run_collection_bench(mode)
                 && run_list_points_bench(mode)
+                && run_persistence_write_bench(mode)
                 && run_search_quality_bench(mode)
         }
         "dot" => run_dot_bench(mode),
         "l2" => run_l2_bench(mode),
         "collection" => run_collection_bench(mode),
         "list_points" => run_list_points_bench(mode),
+        "persistence_write" => run_persistence_write_bench(mode),
         "search_quality" => run_search_quality_bench(mode),
         _ => {
             eprintln!(
-                "error=invalid_scenario scenario=\"{}\" allowed=\"all,dot,l2,collection,list_points,search_quality\"",
+                "error=invalid_scenario scenario=\"{}\" allowed=\"all,dot,l2,collection,list_points,persistence_write,search_quality\"",
                 scenario
             );
             false

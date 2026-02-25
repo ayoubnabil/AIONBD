@@ -48,6 +48,8 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
   and metadata filtering (`must`/`should` + range clauses).
 - Benchmark pipeline publishes dataset comparative tables (`recall@k`, p50/p95/p99,
   memory cost) to `bench/reports/`.
+- Bench scenarios include persistence write-path profiling (`AIONBD_BENCH_SCENARIO=persistence_write`)
+  to compare fsync policies and grouped WAL append behavior.
 - Point payload metadata is supported on upsert/get/search responses.
 - Persistence rotates WAL into incremental snapshots and compacts periodically to control restart cost.
 - Per-collection point capacity is configurable (`AIONBD_MAX_POINTS_PER_COLLECTION`, default `1000000`).
