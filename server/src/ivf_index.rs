@@ -97,7 +97,12 @@ impl IvfIndex {
             && self.mutation_version == collection.mutation_version()
     }
 
-    pub(crate) fn candidate_ids(&self, query: &[f32], limit: usize) -> Vec<u64> {
+    pub(crate) fn candidate_ids_with_target_recall(
+        &self,
+        query: &[f32],
+        limit: usize,
+        target_recall: Option<f32>,
+    ) -> Vec<u64> {
         let mut centroid_scores: Vec<(usize, f32)> = self
             .centroids
             .iter()
@@ -105,8 +110,7 @@ impl IvfIndex {
             .map(|(idx, centroid)| (idx, l2_squared(query, centroid)))
             .collect();
 
-        let required_lists = limit.saturating_mul(self.nlist).div_ceil(self.len.max(1));
-        let probe = self.nprobe.max(required_lists).min(self.nlist).max(1);
+        let probe = self.probe_for_request(limit, target_recall);
         if centroid_scores.len() > probe {
             let nth = probe - 1;
             centroid_scores.select_nth_unstable_by(nth, |left, right| left.1.total_cmp(&right.1));
@@ -123,6 +127,19 @@ impl IvfIndex {
             candidate_ids.extend(self.lists[centroid_idx].iter().copied());
         }
         candidate_ids
+    }
+
+    fn probe_for_request(&self, limit: usize, target_recall: Option<f32>) -> usize {
+        let required_lists = limit.saturating_mul(self.nlist).div_ceil(self.len.max(1));
+        let mut probe = self.nprobe.max(required_lists).min(self.nlist).max(1);
+
+        if let Some(target_recall) = target_recall {
+            let target_lists =
+                ((self.nlist as f32) * target_recall.clamp(0.0, 1.0)).ceil() as usize;
+            probe = probe.max(target_lists.max(1)).min(self.nlist);
+        }
+
+        probe
     }
 }
 
@@ -227,74 +244,4 @@ fn l2_squared(left: &[f32], right: &[f32]) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use aionbd_core::CollectionConfig;
-
-    use super::*;
-
-    #[test]
-    fn index_becomes_incompatible_for_same_len_updates() {
-        let mut collection = Collection::new(
-            "demo",
-            CollectionConfig::new(2, true).expect("config should be valid"),
-        )
-        .expect("collection should be valid");
-        for id in 0..MIN_INDEXED_POINTS as u64 {
-            collection
-                .upsert_point(id, vec![id as f32, 0.0])
-                .expect("upsert should succeed");
-        }
-
-        let index = IvfIndex::build(&collection).expect("index should build");
-        assert!(index.is_compatible(&collection));
-
-        collection
-            .upsert_point(1, vec![1234.0, 0.0])
-            .expect("update should succeed");
-        assert!(!index.is_compatible(&collection));
-    }
-
-    #[test]
-    fn index_becomes_incompatible_when_collection_len_changes() {
-        let mut collection = Collection::new(
-            "demo",
-            CollectionConfig::new(2, true).expect("config should be valid"),
-        )
-        .expect("collection should be valid");
-        for id in 0..MIN_INDEXED_POINTS as u64 {
-            collection
-                .upsert_point(id, vec![id as f32, 0.0])
-                .expect("upsert should succeed");
-        }
-
-        let index = IvfIndex::build(&collection).expect("index should build");
-        collection
-            .upsert_point(MIN_INDEXED_POINTS as u64 + 1, vec![0.0, 0.0])
-            .expect("insert should succeed");
-        assert!(!index.is_compatible(&collection));
-    }
-
-    #[test]
-    fn candidate_ids_reduce_search_space() {
-        let mut collection = Collection::new(
-            "demo",
-            CollectionConfig::new(2, true).expect("config should be valid"),
-        )
-        .expect("collection should be valid");
-        for id in 0..MIN_INDEXED_POINTS as u64 {
-            let cluster_shift = if id < (MIN_INDEXED_POINTS / 2) as u64 {
-                0.0
-            } else {
-                1_000.0
-            };
-            collection
-                .upsert_point(id, vec![cluster_shift + (id % 10) as f32, 0.0])
-                .expect("upsert should succeed");
-        }
-
-        let index = IvfIndex::build(&collection).expect("index should build");
-        let candidate_ids = index.candidate_ids(&[1_005.0, 0.0], 10);
-        assert!(!candidate_ids.is_empty());
-        assert!(candidate_ids.len() < collection.len());
-    }
-}
+mod tests;

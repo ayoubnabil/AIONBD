@@ -52,23 +52,16 @@ pub(crate) fn select_top_k(
         strict_finite: collection.strict_finite(),
         zero_norm_epsilon: f32::EPSILON,
     };
-    if normalize_target_recall(plan.target_recall)?.is_some() {
-        return Ok(SearchSelection {
-            mode: SearchMode::Exact,
-            recall_at_k: Some(1.0),
-            hits: score_points(
-                collection,
-                plan.query,
-                plan.metric,
-                keep,
-                options,
-                plan.filter,
-                ScoreSource::All,
-            )?,
-        });
-    }
+    let target_recall = normalize_target_recall(plan.target_recall)?;
 
-    match select_candidate_strategy(state, collection_name, collection, &plan, keep)? {
+    match select_candidate_strategy(
+        state,
+        collection_name,
+        collection,
+        &plan,
+        keep,
+        target_recall,
+    )? {
         CandidateStrategy::ExactScan => Ok(SearchSelection {
             mode: SearchMode::Exact,
             recall_at_k: Some(1.0),
@@ -140,6 +133,7 @@ fn select_candidate_strategy(
     collection: &Collection,
     plan: &SearchPlan<'_>,
     keep: usize,
+    target_recall: Option<f32>,
 ) -> Result<CandidateStrategy, ApiError> {
     match plan.mode {
         SearchMode::Exact => Ok(CandidateStrategy::ExactScan),
@@ -167,7 +161,7 @@ fn select_candidate_strategy(
                 if index.is_compatible(collection) {
                     record_l2_lookup_hit(state);
                     return Ok(CandidateStrategy::Ivf(
-                        index.candidate_ids(plan.query, keep),
+                        index.candidate_ids_with_target_recall(plan.query, keep, target_recall),
                     ));
                 }
             }
