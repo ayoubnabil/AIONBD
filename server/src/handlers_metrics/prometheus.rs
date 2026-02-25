@@ -68,6 +68,9 @@ aionbd_l2_index_build_successes {}\n\
 # HELP aionbd_l2_index_build_failures Total failed asynchronous L2 index builds.\n\
 # TYPE aionbd_l2_index_build_failures counter\n\
 aionbd_l2_index_build_failures {}\n\
+# HELP aionbd_l2_index_build_cooldown_skips Total asynchronous L2 index build requests skipped due to cooldown.\n\
+# TYPE aionbd_l2_index_build_cooldown_skips counter\n\
+aionbd_l2_index_build_cooldown_skips {}\n\
 # HELP aionbd_l2_index_build_in_flight Number of currently running asynchronous L2 index builds.\n\
 # TYPE aionbd_l2_index_build_in_flight gauge\n\
 aionbd_l2_index_build_in_flight {}\n\
@@ -159,6 +162,7 @@ aionbd_max_points_per_collection {}\n",
         metrics.l2_index_build_requests,
         metrics.l2_index_build_successes,
         metrics.l2_index_build_failures,
+        metrics.l2_index_build_cooldown_skips,
         metrics.l2_index_build_in_flight,
         metrics.auth_failures_total,
         metrics.rate_limit_rejections_total,

@@ -127,6 +127,10 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .metrics
             .l2_index_build_failures
             .load(Ordering::Relaxed),
+        l2_index_build_cooldown_skips: state
+            .metrics
+            .l2_index_build_cooldown_skips
+            .load(Ordering::Relaxed),
         l2_index_build_in_flight: l2_build_in_flight(state),
         auth_failures_total: state.metrics.auth_failures_total.load(Ordering::Relaxed),
         rate_limit_rejections_total: state

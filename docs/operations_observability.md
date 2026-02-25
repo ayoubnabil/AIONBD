@@ -59,6 +59,7 @@ Create one dashboard with these panels:
    `aionbd_persistence_incremental_size_bytes`
 7. Index cache quality:
    `aionbd_l2_index_cache_hit_ratio`, `aionbd_l2_index_build_in_flight`, `rate(aionbd_l2_index_build_failures[5m])`
+   `rate(aionbd_l2_index_build_cooldown_skips[5m])`
 8. Quota and abuse signals:
    `rate(aionbd_tenant_quota_collection_rejections_total[5m])`
    `rate(aionbd_tenant_quota_point_rejections_total[5m])`
@@ -178,6 +179,15 @@ groups:
           summary: "AIONBD IVF index builds are failing"
           description: "Asynchronous L2 index build failures detected."
 
+      - alert: AionbdIndexBuildCooldownSkipsHigh
+        expr: rate(aionbd_l2_index_build_cooldown_skips[10m]) > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD IVF index rebuild cooldown skips are high"
+          description: "Frequent cooldown skips indicate index churn under mutation-heavy load."
+
       - alert: AionbdQuotaPressure
         expr: |
           rate(aionbd_tenant_quota_collection_rejections_total[10m]) > 0
@@ -241,51 +251,46 @@ When `AionbdNotReady` fires:
 1. Check `aionbd_engine_loaded` and `aionbd_storage_available`.
 2. If storage is down, inspect disk free space, filesystem errors, and persistence logs.
 3. Verify recent `aionbd_persistence_checkpoint_degraded_total` trend.
-
 When `AionbdCheckpointDegraded` fires:
 1. Confirm WAL write rate (`aionbd_persistence_writes`) and checkpoint degradation rate.
 2. Inspect snapshot path permissions and available disk.
 3. Trigger controlled restart only after confirming WAL/snapshot files are healthy.
-
 When `AionbdWalSyncDisabled` fires:
 1. Confirm this is an intentional throughput-over-durability choice.
 2. If not intentional, restore `AIONBD_WAL_SYNC_ON_WRITE=true`.
 3. Document acknowledged durability risk in incident/change notes.
-
 When `AionbdCheckpointError` fires:
 1. Inspect server logs around checkpoint worker failures.
 2. Correlate with runtime saturation and `aionbd_storage_available`.
 3. Treat sustained errors as a persistence incident and reduce write pressure.
-
 When `AionbdWalTailOpen` fires:
 1. Check `aionbd_persistence_wal_tail_open` together with `aionbd_persistence_wal_size_bytes`.
 2. Correlate with recent crashes/restarts and disk errors.
 3. If signal persists, plan controlled restart and inspect WAL replay behavior.
-
 When `AionbdWalBacklogGrowing` or `AionbdIncrementalBacklogGrowing` fires:
 1. Check `aionbd_persistence_wal_size_bytes`, `aionbd_persistence_incremental_segments`, and `aionbd_persistence_incremental_size_bytes`.
 2. Correlate with `rate(aionbd_persistence_writes[5m])` and checkpoint degradation events.
 3. If growth is sustained, reduce ingest pressure and investigate checkpoint/compaction throughput.
-
 When `AionbdTenantTrackingCardinalityHigh` fires:
 1. Inspect `aionbd_tenant_rate_window_entries` and `aionbd_tenant_quota_lock_entries`.
 2. Correlate with rate-limit pressure and tenant churn.
 3. Investigate abusive credential rotation and tighten ingress controls.
-
 When `AionbdCollectionWriteLocksCardinalityHigh` fires:
 1. Inspect `aionbd_collection_write_lock_entries` growth against collection churn.
 2. Correlate with spikes in failed writes to missing collections.
 3. If sustained, reduce abusive traffic and verify lock cleanup behavior.
-
 When `AionbdHigh5xxRatio` fires:
 1. Split by endpoint in request logs.
 2. Check whether failures correlate with persistence or index build failures.
 3. If persistence is implicated, lower ingest pressure and investigate disk immediately.
-
 When `AionbdIvfFallbackRatioHigh` fires:
 1. Check `aionbd_l2_index_cache_hit_ratio` and `aionbd_l2_index_build_in_flight`.
 2. Check `rate(aionbd_l2_index_build_failures[5m])` and recent mutation rate.
 3. If fallback persists, increase indexing capacity and investigate cache invalidation churn.
+When `AionbdIndexBuildCooldownSkipsHigh` fires:
+1. Compare `rate(aionbd_l2_index_build_cooldown_skips[10m])` with write/mutation rate.
+2. Investigate mutation bursts causing repeated invalidation/rebuild attempts.
+3. Tune ingest patterns or index policy to reduce rebuild churn.
 
 ## Notes
 

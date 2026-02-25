@@ -14,6 +14,7 @@ mod collection_deletion;
 mod engine_guard;
 mod filtering;
 mod http_metrics;
+mod index_build_cooldown;
 mod index_cache;
 mod limits;
 mod limits_locking;

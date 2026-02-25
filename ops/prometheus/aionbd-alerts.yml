@@ -106,6 +106,15 @@ groups:
           summary: "AIONBD IVF index builds are failing"
           description: "Asynchronous L2 index build failures detected."
 
+      - alert: AionbdIndexBuildCooldownSkipsHigh
+        expr: rate(aionbd_l2_index_build_cooldown_skips[10m]) > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD IVF index rebuild cooldown skips are high"
+          description: "Frequent cooldown skips indicate index churn under mutation-heavy load."
+
       - alert: AionbdAuthFailures
         expr: rate(aionbd_auth_failures_total[10m]) > 0
         for: 10m

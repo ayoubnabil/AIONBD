@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use std::sync::RwLock;
 use std::time::Instant;
 
@@ -41,6 +42,7 @@ pub(crate) struct MetricsState {
     pub(crate) l2_index_build_requests: AtomicU64,
     pub(crate) l2_index_build_successes: AtomicU64,
     pub(crate) l2_index_build_failures: AtomicU64,
+    pub(crate) l2_index_build_cooldown_skips: AtomicU64,
     pub(crate) auth_failures_total: AtomicU64,
     pub(crate) rate_limit_rejections_total: AtomicU64,
     pub(crate) tenant_quota_collection_rejections_total: AtomicU64,
@@ -62,6 +64,7 @@ pub(crate) struct AppState {
     pub(crate) persistence_io_serial: Arc<Semaphore>,
     pub(crate) collection_write_locks: Arc<Mutex<BTreeMap<String, Arc<Semaphore>>>>,
     pub(crate) l2_index_building: Arc<RwLock<BTreeSet<String>>>,
+    pub(crate) l2_index_last_started_ms: Arc<StdMutex<BTreeMap<String, u64>>>,
     pub(crate) tenant_rate_windows: Arc<Mutex<BTreeMap<String, TenantRateWindow>>>,
     pub(crate) tenant_quota_locks: Arc<Mutex<BTreeMap<String, Arc<Semaphore>>>>,
     pub(crate) collections: Arc<RwLock<CollectionRegistry>>,
@@ -101,6 +104,7 @@ impl AppState {
             persistence_io_serial: Arc::new(Semaphore::new(1)),
             collection_write_locks: Arc::new(Mutex::new(collection_write_locks)),
             l2_index_building: Arc::new(RwLock::new(BTreeSet::new())),
+            l2_index_last_started_ms: Arc::new(StdMutex::new(BTreeMap::new())),
             tenant_rate_windows: Arc::new(Mutex::new(BTreeMap::new())),
             tenant_quota_locks: Arc::new(Mutex::new(BTreeMap::new())),
             collections: Arc::new(RwLock::new(collections)),

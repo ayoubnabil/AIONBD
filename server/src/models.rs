@@ -82,6 +82,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) l2_index_build_requests: u64,
     pub(crate) l2_index_build_successes: u64,
     pub(crate) l2_index_build_failures: u64,
+    pub(crate) l2_index_build_cooldown_skips: u64,
     pub(crate) l2_index_build_in_flight: usize,
     pub(crate) auth_failures_total: u64,
     pub(crate) rate_limit_rejections_total: u64,

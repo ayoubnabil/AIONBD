@@ -8,7 +8,7 @@ use aionbd_core::{
 use tokio::task;
 
 use crate::errors::ApiError;
-use crate::index_manager::remove_l2_index_entry;
+use crate::index_manager::{clear_l2_build_tracking, remove_l2_index_entry};
 use crate::state::AppState;
 
 const CHECKPOINT_COMPACT_AFTER: usize = 64;
@@ -110,6 +110,7 @@ fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {
     match record {
         WalRecord::CreateCollection { name, .. } | WalRecord::DeleteCollection { name } => {
             remove_l2_index_entry(state, name);
+            clear_l2_build_tracking(state, name);
         }
         WalRecord::UpsertPoint { collection, .. } | WalRecord::DeletePoint { collection, .. } => {
             remove_l2_index_entry(state, collection);

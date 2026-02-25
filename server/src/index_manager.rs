@@ -1,9 +1,12 @@
 use std::sync::atomic::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use aionbd_core::Collection;
 
 use crate::ivf_index::IvfIndex;
 use crate::state::AppState;
+
+const L2_BUILD_COOLDOWN_MS: u64 = 1_000;
 
 pub(crate) fn record_l2_lookup_hit(state: &AppState) {
     let _ = state
@@ -50,6 +53,12 @@ pub(crate) fn remove_l2_index_entry(state: &AppState, collection_name: &str) {
     }
 }
 
+pub(crate) fn clear_l2_build_tracking(state: &AppState, collection_name: &str) {
+    if let Ok(mut started) = state.l2_index_last_started_ms.lock() {
+        let _ = started.remove(collection_name);
+    }
+}
+
 pub(crate) fn schedule_l2_build_if_needed(
     state: &AppState,
     collection_name: &str,
@@ -60,14 +69,18 @@ pub(crate) fn schedule_l2_build_if_needed(
     }
 
     let collection_name = collection_name.to_string();
-    {
-        let Ok(mut building) = state.l2_index_building.write() else {
-            return;
-        };
-        if building.contains(&collection_name) {
-            return;
-        }
-        building.insert(collection_name.clone());
+    if is_l2_build_in_flight(state, &collection_name) {
+        return;
+    }
+    if should_throttle_build(state, &collection_name) {
+        let _ = state
+            .metrics
+            .l2_index_build_cooldown_skips
+            .fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+    if !mark_l2_build_in_flight(state, &collection_name) {
+        return;
     }
 
     let _ = state
@@ -148,6 +161,50 @@ pub(crate) fn schedule_l2_build_if_needed(
             }
         }
     });
+}
+
+fn is_l2_build_in_flight(state: &AppState, collection_name: &str) -> bool {
+    state
+        .l2_index_building
+        .read()
+        .map(|building| building.contains(collection_name))
+        .unwrap_or(false)
+}
+
+fn mark_l2_build_in_flight(state: &AppState, collection_name: &str) -> bool {
+    let Ok(mut building) = state.l2_index_building.write() else {
+        return false;
+    };
+    if building.contains(collection_name) {
+        return false;
+    }
+    building.insert(collection_name.to_string());
+    true
+}
+
+fn should_throttle_build(state: &AppState, collection_name: &str) -> bool {
+    if L2_BUILD_COOLDOWN_MS == 0 {
+        return false;
+    }
+    let now_ms = now_millis();
+    let Ok(mut started) = state.l2_index_last_started_ms.lock() else {
+        return false;
+    };
+    let throttled = started
+        .get(collection_name)
+        .is_some_and(|last_ms| now_ms.saturating_sub(*last_ms) < L2_BUILD_COOLDOWN_MS);
+    if !throttled {
+        started.insert(collection_name.to_string(), now_ms);
+    }
+    throttled
+}
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(u64::MAX as u128) as u64
 }
 
 pub(crate) fn warmup_l2_indexes(state: &AppState) {
