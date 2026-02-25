@@ -111,6 +111,7 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
     assert_eq!(payload["persistence_wal_sync_every_n_writes"], 0);
     assert_eq!(payload["persistence_wal_group_commit_max_batch"], 16);
+    assert_eq!(payload["persistence_wal_group_commit_flush_delay_ms"], 0);
     assert_eq!(payload["persistence_async_checkpoints"], false);
     assert_eq!(payload["persistence_checkpoint_compact_after"], 64);
     assert_eq!(payload["persistence_writes"], 0);
@@ -258,6 +259,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
     assert_eq!(payload["persistence_wal_sync_every_n_writes"], 0);
     assert_eq!(payload["persistence_wal_group_commit_max_batch"], 16);
+    assert_eq!(payload["persistence_wal_group_commit_flush_delay_ms"], 0);
     assert_eq!(payload["persistence_async_checkpoints"], false);
     assert_eq!(payload["persistence_checkpoint_compact_after"], 64);
     assert_eq!(payload["persistence_checkpoint_schedule_skips_total"], 4);

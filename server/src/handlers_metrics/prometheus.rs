@@ -116,6 +116,9 @@ aionbd_persistence_wal_sync_every_n_writes {}\n\
 # HELP aionbd_persistence_wal_group_commit_max_batch Maximum number of writes coalesced into one WAL group commit.\n\
 # TYPE aionbd_persistence_wal_group_commit_max_batch gauge\n\
 aionbd_persistence_wal_group_commit_max_batch {}\n\
+# HELP aionbd_persistence_wal_group_commit_flush_delay_ms Delay window in milliseconds used to coalesce WAL group commits.\n\
+# TYPE aionbd_persistence_wal_group_commit_flush_delay_ms gauge\n\
+aionbd_persistence_wal_group_commit_flush_delay_ms {}\n\
 # HELP aionbd_persistence_async_checkpoints Persistence async checkpoint scheduling flag (1 enabled, 0 disabled).\n\
 # TYPE aionbd_persistence_async_checkpoints gauge\n\
 aionbd_persistence_async_checkpoints {}\n\
@@ -208,6 +211,7 @@ aionbd_max_points_per_collection {}\n",
         bool_as_u8(metrics.persistence_wal_sync_on_write),
         metrics.persistence_wal_sync_every_n_writes,
         metrics.persistence_wal_group_commit_max_batch,
+        metrics.persistence_wal_group_commit_flush_delay_ms,
         bool_as_u8(metrics.persistence_async_checkpoints),
         metrics.persistence_checkpoint_compact_after,
         metrics.persistence_writes,

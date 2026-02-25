@@ -5,6 +5,7 @@ const CHECKPOINT_COMPACT_AFTER: usize = 64;
 const ASYNC_CHECKPOINTS_DEFAULT: bool = false;
 const WAL_SYNC_EVERY_N_DEFAULT: u64 = 0;
 const WAL_GROUP_MAX_BATCH_DEFAULT: usize = 16;
+const WAL_GROUP_FLUSH_DELAY_MS_DEFAULT: u64 = 0;
 
 pub(crate) fn configured_async_checkpoints() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
@@ -101,6 +102,27 @@ pub(crate) fn configured_wal_group_commit_max_batch() -> usize {
                     "invalid AIONBD_WAL_GROUP_COMMIT_MAX_BATCH; using default"
                 );
                 WAL_GROUP_MAX_BATCH_DEFAULT
+            }
+        }
+    })
+}
+
+pub(crate) fn configured_wal_group_commit_flush_delay_ms() -> u64 {
+    static FLUSH_DELAY_MS: OnceLock<u64> = OnceLock::new();
+    *FLUSH_DELAY_MS.get_or_init(|| {
+        let Ok(raw) = std::env::var("AIONBD_WAL_GROUP_COMMIT_FLUSH_DELAY_MS") else {
+            return WAL_GROUP_FLUSH_DELAY_MS_DEFAULT;
+        };
+        match raw.parse::<u64>() {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!(
+                    %raw,
+                    %error,
+                    default = WAL_GROUP_FLUSH_DELAY_MS_DEFAULT,
+                    "invalid AIONBD_WAL_GROUP_COMMIT_FLUSH_DELAY_MS; using default"
+                );
+                WAL_GROUP_FLUSH_DELAY_MS_DEFAULT
             }
         }
     })

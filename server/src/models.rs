@@ -98,6 +98,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) persistence_wal_sync_on_write: bool,
     pub(crate) persistence_wal_sync_every_n_writes: u64,
     pub(crate) persistence_wal_group_commit_max_batch: usize,
+    pub(crate) persistence_wal_group_commit_flush_delay_ms: u64,
     pub(crate) persistence_async_checkpoints: bool,
     pub(crate) persistence_checkpoint_compact_after: usize,
     pub(crate) persistence_writes: u64,

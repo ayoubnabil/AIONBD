@@ -6,6 +6,7 @@ use aionbd_core::{
     CheckpointPolicy, PersistOutcome, PersistenceError, WalRecord,
 };
 use tokio::task;
+use tokio::time::Duration;
 
 use crate::errors::ApiError;
 use crate::index_manager::{clear_l2_build_tracking, remove_l2_index_entry};
@@ -19,7 +20,8 @@ use settings::{
 };
 pub(crate) use settings::{
     configured_async_checkpoints, configured_checkpoint_compact_after,
-    configured_wal_group_commit_max_batch, configured_wal_sync_every_n_writes,
+    configured_wal_group_commit_flush_delay_ms, configured_wal_group_commit_max_batch,
+    configured_wal_sync_every_n_writes,
 };
 
 pub(crate) async fn persist_change_if_enabled(
@@ -78,6 +80,7 @@ async fn append_wal_record_with_config(state: &AppState, record: WalRecord) -> R
     let sync_on_write = state.config.wal_sync_on_write;
     let sync_every_n_writes = configured_wal_sync_every_n_writes();
     let max_batch = configured_wal_group_commit_max_batch();
+    let flush_delay_ms = configured_wal_group_commit_flush_delay_ms();
 
     if max_batch <= 1 {
         let wal_path = state.config.wal_path.clone();
@@ -96,7 +99,15 @@ async fn append_wal_record_with_config(state: &AppState, record: WalRecord) -> R
         .map_err(|error| error.to_string());
     }
 
-    append_wal_record_grouped(state, record, sync_on_write, sync_every_n_writes, max_batch).await
+    append_wal_record_grouped(
+        state,
+        record,
+        sync_on_write,
+        sync_every_n_writes,
+        max_batch,
+        flush_delay_ms,
+    )
+    .await
 }
 
 async fn append_wal_record_grouped(
@@ -105,10 +116,18 @@ async fn append_wal_record_grouped(
     sync_on_write: bool,
     sync_every_n_writes: u64,
     max_batch: usize,
+    flush_delay_ms: u64,
 ) -> Result<(), String> {
     let (is_leader, response) = state.wal_group_queue.enqueue(record).await;
     if is_leader {
-        run_wal_group_leader(state, sync_on_write, sync_every_n_writes, max_batch).await;
+        run_wal_group_leader(
+            state,
+            sync_on_write,
+            sync_every_n_writes,
+            max_batch,
+            flush_delay_ms,
+        )
+        .await;
     }
     response
         .await
@@ -120,8 +139,15 @@ async fn run_wal_group_leader(
     sync_on_write: bool,
     sync_every_n_writes: u64,
     max_batch: usize,
+    flush_delay_ms: u64,
 ) {
     loop {
+        if flush_delay_ms > 0 {
+            let pending_len = state.wal_group_queue.pending_len().await;
+            if pending_len > 0 && pending_len < max_batch {
+                tokio::time::sleep(Duration::from_millis(flush_delay_ms)).await;
+            }
+        }
         let pending = state
             .wal_group_queue
             .take_batch_or_release_leader(max_batch)

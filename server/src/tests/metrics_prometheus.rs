@@ -108,6 +108,7 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_persistence_wal_sync_on_write 1"));
     assert!(payload.contains("aionbd_persistence_wal_sync_every_n_writes 0"));
     assert!(payload.contains("aionbd_persistence_wal_group_commit_max_batch 16"));
+    assert!(payload.contains("aionbd_persistence_wal_group_commit_flush_delay_ms 0"));
     assert!(payload.contains("aionbd_persistence_async_checkpoints 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_compact_after 64"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
@@ -227,6 +228,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_persistence_wal_sync_on_write 0"));
     assert!(payload.contains("aionbd_persistence_wal_sync_every_n_writes 0"));
     assert!(payload.contains("aionbd_persistence_wal_group_commit_max_batch 16"));
+    assert!(payload.contains("aionbd_persistence_wal_group_commit_flush_delay_ms 0"));
     assert!(payload.contains("aionbd_persistence_async_checkpoints 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_compact_after 64"));
     assert!(payload.contains("aionbd_persistence_writes 12"));

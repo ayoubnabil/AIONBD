@@ -53,6 +53,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Per-collection point capacity is configurable (`AIONBD_MAX_POINTS_PER_COLLECTION`, default `1000000`).
 - WAL durability mode is configurable (`AIONBD_WAL_SYNC_ON_WRITE`, default `true`) with optional periodic fsync cadence (`AIONBD_WAL_SYNC_EVERY_N_WRITES`, default `0`).
 - WAL group commit batching is configurable (`AIONBD_WAL_GROUP_COMMIT_MAX_BATCH`, default `16`).
+- WAL group commit flush delay is configurable (`AIONBD_WAL_GROUP_COMMIT_FLUSH_DELAY_MS`, default `0`).
 - Incremental checkpoint compaction threshold is configurable (`AIONBD_CHECKPOINT_COMPACT_AFTER`, default `64`).
 - IVF async rebuild cooldown is configurable (`AIONBD_L2_INDEX_BUILD_COOLDOWN_MS`, default `1000`).
 - IVF warmup at boot is configurable (`AIONBD_L2_INDEX_WARMUP_ON_BOOT`, default `true`).
