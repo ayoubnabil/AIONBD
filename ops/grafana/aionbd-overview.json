@@ -254,6 +254,33 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Persistence scheduler and group commit pressure",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "rate(aionbd_persistence_checkpoint_schedule_skips_total[5m])",
+          "legendFormat": "schedule_skips/s",
+          "refId": "A"
+        },
+        {
+          "expr": "aionbd_persistence_checkpoint_in_flight",
+          "legendFormat": "checkpoint_in_flight",
+          "refId": "B"
+        },
+        {
+          "expr": "aionbd_persistence_wal_group_queue_depth",
+          "legendFormat": "queue_depth",
+          "refId": "C"
+        },
+        {
+          "expr": "rate(aionbd_persistence_wal_grouped_records_total[5m]) / clamp_min(rate(aionbd_persistence_wal_group_commits_total[5m]), 1)",
+          "legendFormat": "avg_group_size",
+          "refId": "D"
+        }
+      ]
     }
   ],
   "refresh": "30s",
@@ -266,6 +293,6 @@
   "timezone": "browser",
   "title": "AIONBD Overview",
   "uid": "aionbd-overview",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

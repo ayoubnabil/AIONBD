@@ -179,3 +179,39 @@ groups:
         annotations:
           summary: "AIONBD explicit IVF requests are frequently falling back to exact"
           description: "Fallback ratio stayed above 25%; index cache/build policy may be under-provisioned."
+
+      - alert: AionbdWalGroupQueueDepthHigh
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_wal_group_queue_depth > 1024
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL group-commit queue depth is high"
+          description: "Pending WAL queue stayed above 1024 writes; write latency/backpressure risk is increasing."
+
+      - alert: AionbdCheckpointSchedulerSaturated
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          rate(aionbd_persistence_checkpoint_schedule_skips_total[10m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint scheduler is saturated"
+          description: "Due checkpoints are repeatedly skipped because a checkpoint is already in flight."
+
+      - alert: AionbdCheckpointInFlightStuck
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_checkpoint_in_flight == 1
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint appears stuck in-flight"
+          description: "Checkpoint remained in-flight for over 20 minutes; inspect persistence throughput and disk health."
