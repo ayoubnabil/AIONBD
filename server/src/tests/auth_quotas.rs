@@ -218,3 +218,36 @@ async fn tenant_point_quota_is_enforced_across_collections() {
         .expect("response expected");
     assert_eq!(upsert_other_tenant.status(), StatusCode::OK);
 }
+
+#[tokio::test]
+async fn disabled_tenant_quotas_do_not_allocate_quota_lock_entries() {
+    let state = quota_state(0, 0);
+    let inspect_state = state.clone();
+    let app = build_app(state);
+
+    let create = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "POST",
+            "/collections",
+            "key-a",
+            Some(json!({"name":"nolock","dimension":3})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(create.status(), StatusCode::OK);
+
+    let upsert = app
+        .oneshot(request_with_api_key(
+            "PUT",
+            "/collections/nolock/points/1",
+            "key-a",
+            Some(json!({"values":[1.0,2.0,3.0]})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(upsert.status(), StatusCode::OK);
+
+    let locks = inspect_state.tenant_quota_locks.lock().await;
+    assert!(locks.is_empty());
+}

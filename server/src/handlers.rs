@@ -19,7 +19,7 @@ use crate::models::{
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 use crate::tenant_quota::{
-    acquire_tenant_quota_guard, tenant_collection_count, tenant_point_count,
+    maybe_acquire_tenant_quota_guard, tenant_collection_count, tenant_point_count,
 };
 use crate::write_path::{
     apply_upsert, collection_exists, insert_collection, load_collection_handle,
@@ -47,7 +47,7 @@ pub(crate) async fn create_collection(
     let collection = Collection::new(name.clone(), config).map_err(map_collection_error)?;
     let handle = std::sync::Arc::new(std::sync::RwLock::new(collection));
 
-    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
+    let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
     let collection_guard = collection_write_lock(&state, &name)
         .await?
         .acquire_owned()
@@ -170,7 +170,7 @@ pub(crate) async fn delete_collection(
 ) -> Result<Json<DeleteCollectionResponse>, ApiError> {
     let response_name = canonical_collection_name(&name)?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
-    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
+    let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
     let collection_guard = existing_collection_write_lock(&state, &name)
         .await?
         .acquire_owned()
@@ -209,7 +209,7 @@ pub(crate) async fn upsert_point(
 ) -> Result<Json<UpsertPointResponse>, ApiError> {
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
-    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
+    let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
     let _collection_guard = existing_collection_write_lock(&state, &name)
         .await?
         .acquire_owned()

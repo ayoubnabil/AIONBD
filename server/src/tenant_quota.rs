@@ -8,6 +8,10 @@ use crate::errors::ApiError;
 use crate::handler_utils::visible_collection_name;
 use crate::state::{AppState, CollectionHandle};
 
+pub(crate) fn tenant_quotas_enabled(state: &AppState) -> bool {
+    state.auth_config.tenant_max_collections > 0 || state.auth_config.tenant_max_points > 0
+}
+
 pub(crate) async fn acquire_tenant_quota_guard(
     state: &AppState,
     tenant: &TenantContext,
@@ -26,6 +30,16 @@ pub(crate) async fn acquire_tenant_quota_guard(
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("tenant quota semaphore closed"))
+}
+
+pub(crate) async fn maybe_acquire_tenant_quota_guard(
+    state: &AppState,
+    tenant: &TenantContext,
+) -> Result<Option<OwnedSemaphorePermit>, ApiError> {
+    if !tenant_quotas_enabled(state) {
+        return Ok(None);
+    }
+    acquire_tenant_quota_guard(state, tenant).await.map(Some)
 }
 
 pub(crate) async fn tenant_collection_count(
