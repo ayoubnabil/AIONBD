@@ -140,3 +140,60 @@ async fn remove_collection_write_lock_keeps_shared_lock_and_removes_when_idle() 
         .expect("lock removal should not fail");
     assert!(!state.collection_write_locks.lock().await.contains_key(name));
 }
+
+#[tokio::test]
+async fn stale_write_lock_entry_is_pruned_after_missing_collection_write() {
+    let state = test_state();
+    let app = build_app(state.clone());
+
+    {
+        let mut locks = state.collection_write_locks.lock().await;
+        locks.insert(
+            "ghost".to_string(),
+            std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        );
+    }
+
+    let upsert_req = Request::builder()
+        .method("PUT")
+        .uri("/collections/ghost/points/1")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({"values": [1.0, 2.0]}).to_string()))
+        .expect("request must build");
+    let upsert_resp = app
+        .clone()
+        .oneshot(upsert_req)
+        .await
+        .expect("response expected");
+    assert_eq!(upsert_resp.status(), StatusCode::NOT_FOUND);
+    assert!(!state
+        .collection_write_locks
+        .lock()
+        .await
+        .contains_key("ghost"));
+
+    {
+        let mut locks = state.collection_write_locks.lock().await;
+        locks.insert(
+            "ghost".to_string(),
+            std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        );
+    }
+
+    let delete_req = Request::builder()
+        .method("DELETE")
+        .uri("/collections/ghost/points/1")
+        .body(Body::empty())
+        .expect("request must build");
+    let delete_resp = app
+        .clone()
+        .oneshot(delete_req)
+        .await
+        .expect("response expected");
+    assert_eq!(delete_resp.status(), StatusCode::NOT_FOUND);
+    assert!(!state
+        .collection_write_locks
+        .lock()
+        .await
+        .contains_key("ghost"));
+}

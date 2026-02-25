@@ -178,6 +178,8 @@ pub(crate) async fn delete_collection(
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
 
     if !collection_exists(state.clone(), name.clone()).await? {
+        drop(collection_guard);
+        let _ = remove_collection_write_lock(&state, &name).await;
         return Err(ApiError::not_found(format!(
             "collection '{name}' not found"
         )));
@@ -210,11 +212,18 @@ pub(crate) async fn upsert_point(
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
     let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
-    let _collection_guard = existing_collection_write_lock(&state, &name)
+    let collection_guard = existing_collection_write_lock(&state, &name)
         .await?
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
+    if !collection_exists(state.clone(), name.clone()).await? {
+        drop(collection_guard);
+        let _ = remove_collection_write_lock(&state, &name).await;
+        return Err(ApiError::not_found(format!(
+            "collection '{name}' not found"
+        )));
+    }
     let handle = load_collection_handle(state.clone(), name.clone()).await?;
 
     let values = payload.values;
