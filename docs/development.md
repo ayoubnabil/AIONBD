@@ -28,7 +28,6 @@ Full local verification:
 ./scripts/verify_local.sh --fast
 ./scripts/verify_local.sh --changed
 ./scripts/verify_chaos.sh
-AIONBD_CHAOS_DRY_RUN=1 ./scripts/verify_chaos.sh
 ```
 
 Run API:
@@ -255,7 +254,6 @@ python3 scripts/check_soak_pipeline_smoke.py
 
 Wrapper for soak pipeline runs:
 ```bash
-./scripts/verify_soak.sh
 AIONBD_SOAK_DRY_RUN=1 ./scripts/verify_soak.sh
 AIONBD_SOAK_DRY_RUN=1 ./scripts/verify_soak.sh --profiles-file ops/soak/longrun_profiles.json
 ```
@@ -270,6 +268,12 @@ python3 scripts/run_chaos_pipeline.py \
 Fast chaos pipeline smoke check:
 ```bash
 python3 scripts/check_chaos_pipeline_smoke.py
+```
+
+Compare current reports against versioned dry-run baselines:
+```bash
+python3 scripts/compare_report_regressions.py --kind soak --baseline ops/baselines/soak_pipeline_dryrun_baseline.json --current bench/reports/soak_pipeline_report.json
+python3 scripts/compare_report_regressions.py --kind chaos --baseline ops/baselines/chaos_pipeline_dryrun_baseline.json --current bench/reports/chaos_pipeline_dryrun_report.json
 ```
 
 ## Python SDK commands

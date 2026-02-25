@@ -23,6 +23,17 @@ jobs:
         run: ./scripts/verify_local.sh
       - name: Chaos persistence verification
         run: ./scripts/verify_chaos.sh
+      - name: Chaos dry-run baseline regression check
+        env:
+          AIONBD_CHAOS_DRY_RUN: "1"
+          AIONBD_CHAOS_REPORT_PATH: "bench/reports/chaos_pipeline_dryrun_report.md"
+          AIONBD_CHAOS_REPORT_JSON_PATH: "bench/reports/chaos_pipeline_dryrun_report.json"
+        run: |
+          ./scripts/verify_chaos.sh
+          python3 scripts/compare_report_regressions.py \
+            --kind chaos \
+            --baseline ops/baselines/chaos_pipeline_dryrun_baseline.json \
+            --current bench/reports/chaos_pipeline_dryrun_report.json
       - name: Upload chaos pipeline report
         uses: actions/upload-artifact@v4
         with:
@@ -30,6 +41,8 @@ jobs:
           path: |
             bench/reports/chaos_pipeline_report.md
             bench/reports/chaos_pipeline_report.json
+            bench/reports/chaos_pipeline_dryrun_report.md
+            bench/reports/chaos_pipeline_dryrun_report.json
 
   bench-search-quality:
     runs-on: ubuntu-latest
@@ -74,6 +87,12 @@ jobs:
           AIONBD_SOAK_REPORT_PATH: "bench/reports/soak_pipeline_report.md"
           AIONBD_SOAK_REPORT_JSON_PATH: "bench/reports/soak_pipeline_report.json"
         run: ./scripts/verify_soak.sh --profiles-file ops/soak/longrun_profiles.json
+      - name: Soak dry-run baseline regression check
+        run: |
+          python3 scripts/compare_report_regressions.py \
+            --kind soak \
+            --baseline ops/baselines/soak_pipeline_dryrun_baseline.json \
+            --current bench/reports/soak_pipeline_report.json
       - name: Upload soak pipeline report
         uses: actions/upload-artifact@v4
         with:

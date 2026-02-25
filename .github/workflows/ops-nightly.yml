@@ -1,0 +1,55 @@
+name: Ops Nightly
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  dryrun-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Soak dry-run pipeline
+        env:
+          AIONBD_SOAK_DRY_RUN: "1"
+          AIONBD_SOAK_REPORT_PATH: "bench/reports/soak_pipeline_report.md"
+          AIONBD_SOAK_REPORT_JSON_PATH: "bench/reports/soak_pipeline_report.json"
+        run: ./scripts/verify_soak.sh --profiles-file ops/soak/longrun_profiles.json
+
+      - name: Soak baseline regression check
+        run: |
+          python3 scripts/compare_report_regressions.py \
+            --kind soak \
+            --baseline ops/baselines/soak_pipeline_dryrun_baseline.json \
+            --current bench/reports/soak_pipeline_report.json
+
+      - name: Chaos dry-run pipeline
+        env:
+          AIONBD_CHAOS_DRY_RUN: "1"
+          AIONBD_CHAOS_REPORT_PATH: "bench/reports/chaos_pipeline_dryrun_report.md"
+          AIONBD_CHAOS_REPORT_JSON_PATH: "bench/reports/chaos_pipeline_dryrun_report.json"
+        run: ./scripts/verify_chaos.sh
+
+      - name: Chaos baseline regression check
+        run: |
+          python3 scripts/compare_report_regressions.py \
+            --kind chaos \
+            --baseline ops/baselines/chaos_pipeline_dryrun_baseline.json \
+            --current bench/reports/chaos_pipeline_dryrun_report.json
+
+      - name: Upload ops dry-run reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-dryrun-reports
+          path: |
+            bench/reports/soak_pipeline_report.md
+            bench/reports/soak_pipeline_report.json
+            bench/reports/chaos_pipeline_dryrun_report.md
+            bench/reports/chaos_pipeline_dryrun_report.json

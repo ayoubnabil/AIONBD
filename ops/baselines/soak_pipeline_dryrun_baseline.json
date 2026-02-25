@@ -1,0 +1,40 @@
+{
+  "generated_at_utc": "2026-02-25T18:12:49.599651+00:00",
+  "dry_run": true,
+  "rows": [
+    {
+      "duration_seconds": 86400.0,
+      "workers": 8,
+      "metric": "l2",
+      "search_mode": "auto",
+      "write_ratio": 0.1,
+      "total_ops": 57369600,
+      "read_ops": 51632640,
+      "write_ops": 5736960,
+      "error_ops": 0,
+      "error_rate": 0.0,
+      "throughput_ops_per_second": 664.0,
+      "latency_us_p50": 2200,
+      "latency_us_p95": 11200,
+      "latency_us_p99": 22000,
+      "profile": "read_heavy_24h"
+    },
+    {
+      "duration_seconds": 259200.0,
+      "workers": 8,
+      "metric": "l2",
+      "search_mode": "auto",
+      "write_ratio": 0.3,
+      "total_ops": 163814400,
+      "read_ops": 114670080,
+      "write_ops": 49144320,
+      "error_ops": 0,
+      "error_rate": 0.0,
+      "throughput_ops_per_second": 632.0,
+      "latency_us_p50": 2600,
+      "latency_us_p95": 13600,
+      "latency_us_p99": 26000,
+      "profile": "mixed_72h"
+    }
+  ]
+}
