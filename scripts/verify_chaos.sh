@@ -4,5 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-cargo test -p aionbd-core persistence::tests_chaos::
-cargo test -p aionbd-server --bin aionbd-server tests::persistence_chaos::
+args=()
+if [[ "${AIONBD_CHAOS_DRY_RUN:-0}" == "1" ]]; then
+  args+=(--dry-run)
+fi
+
+python3 scripts/run_chaos_pipeline.py "${args[@]}" "$@"

@@ -23,6 +23,13 @@ jobs:
         run: ./scripts/verify_local.sh
       - name: Chaos persistence verification
         run: ./scripts/verify_chaos.sh
+      - name: Upload chaos pipeline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-pipeline-report
+          path: |
+            bench/reports/chaos_pipeline_report.md
+            bench/reports/chaos_pipeline_report.json
 
   bench-search-quality:
     runs-on: ubuntu-latest
