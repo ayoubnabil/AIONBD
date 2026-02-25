@@ -103,7 +103,9 @@ fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {
         WalRecord::CreateCollection { name, .. } | WalRecord::DeleteCollection { name } => {
             remove_l2_index_entry(state, name);
         }
-        WalRecord::UpsertPoint { .. } | WalRecord::DeletePoint { .. } => {}
+        WalRecord::UpsertPoint { collection, .. } | WalRecord::DeletePoint { collection, .. } => {
+            remove_l2_index_entry(state, collection);
+        }
     }
 }
 

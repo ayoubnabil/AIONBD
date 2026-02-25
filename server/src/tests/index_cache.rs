@@ -109,6 +109,33 @@ async fn upsert_new_point_invalidates_cached_l2_index() {
 }
 
 #[tokio::test]
+async fn delete_point_invalidates_cached_l2_index() {
+    let state = test_state();
+    seed_cached_l2_index(&state, "cache_delete_point");
+    let app = build_app(state.clone());
+
+    assert!(state
+        .l2_indexes
+        .read()
+        .expect("l2 index cache lock should be available")
+        .contains_key("cache_delete_point"));
+
+    let delete_req = Request::builder()
+        .method("DELETE")
+        .uri("/collections/cache_delete_point/points/1")
+        .body(Body::empty())
+        .expect("request must build");
+    let delete_resp = app.oneshot(delete_req).await.expect("response expected");
+    assert_eq!(delete_resp.status(), StatusCode::OK);
+
+    assert!(!state
+        .l2_indexes
+        .read()
+        .expect("l2 index cache lock should be available")
+        .contains_key("cache_delete_point"));
+}
+
+#[tokio::test]
 async fn delete_collection_invalidates_cached_l2_index() {
     let state = test_state();
     seed_cached_l2_index(&state, "cache_delete");

@@ -12,7 +12,6 @@ use crate::handler_utils::{
     visible_collection_name,
 };
 pub(crate) use crate::handlers_health::{distance, live, ready};
-use crate::index_manager::remove_l2_index_entry;
 use crate::models::{
     CollectionResponse, CreateCollectionRequest, DeleteCollectionResponse, ListCollectionsResponse,
     UpsertPointRequest, UpsertPointResponse,
@@ -266,7 +265,5 @@ pub(crate) async fn upsert_point(
             tracing::error!(collection = %name, point_id = id, ?error, "in-memory upsert failed after wal append");
             ApiError::internal("in-memory state update failed after wal append; restart required")
         })?;
-    remove_l2_index_entry(&state, &name);
-
     Ok(Json(UpsertPointResponse { id, created }))
 }

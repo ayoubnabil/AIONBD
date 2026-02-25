@@ -8,7 +8,6 @@ use crate::errors::ApiError;
 use crate::handler_utils::{
     collection_handle, existing_collection_write_lock, scoped_collection_name,
 };
-use crate::index_manager::remove_l2_index_entry;
 use crate::models::{
     DeletePointResponse, ListPointsQuery, ListPointsResponse, PointIdResponse, PointResponse,
     DEFAULT_PAGE_LIMIT,
@@ -159,7 +158,5 @@ pub(crate) async fn delete_point(
             "in-memory state update failed after wal append; restart required",
         ));
     }
-    remove_l2_index_entry(&state, &name);
-
     Ok(Json(DeletePointResponse { id, deleted: true }))
 }
