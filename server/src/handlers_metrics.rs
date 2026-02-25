@@ -97,6 +97,15 @@ aionbd_l2_index_build_failures {}\n\
 # HELP aionbd_l2_index_build_in_flight Number of currently running asynchronous L2 index builds.\n\
 # TYPE aionbd_l2_index_build_in_flight gauge\n\
 aionbd_l2_index_build_in_flight {}\n\
+# HELP aionbd_auth_failures_total Total authentication failures.\n\
+# TYPE aionbd_auth_failures_total counter\n\
+aionbd_auth_failures_total {}\n\
+# HELP aionbd_rate_limit_rejections_total Total rate-limited requests.\n\
+# TYPE aionbd_rate_limit_rejections_total counter\n\
+aionbd_rate_limit_rejections_total {}\n\
+# HELP aionbd_audit_events_total Total emitted audit events.\n\
+# TYPE aionbd_audit_events_total counter\n\
+aionbd_audit_events_total {}\n\
 # HELP aionbd_tenant_quota_collection_rejections_total Total collection write rejections due to tenant quota.\n\
 # TYPE aionbd_tenant_quota_collection_rejections_total counter\n\
 aionbd_tenant_quota_collection_rejections_total {}\n\
@@ -135,6 +144,9 @@ aionbd_persistence_checkpoint_degraded_total {}\n",
         metrics.l2_index_build_successes,
         metrics.l2_index_build_failures,
         metrics.l2_index_build_in_flight,
+        metrics.auth_failures_total,
+        metrics.rate_limit_rejections_total,
+        metrics.audit_events_total,
         metrics.tenant_quota_collection_rejections_total,
         metrics.tenant_quota_point_rejections_total,
         bool_as_u8(metrics.persistence_enabled),
@@ -227,6 +239,12 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .l2_index_build_failures
             .load(Ordering::Relaxed),
         l2_index_build_in_flight: l2_build_in_flight(state),
+        auth_failures_total: state.metrics.auth_failures_total.load(Ordering::Relaxed),
+        rate_limit_rejections_total: state
+            .metrics
+            .rate_limit_rejections_total
+            .load(Ordering::Relaxed),
+        audit_events_total: state.metrics.audit_events_total.load(Ordering::Relaxed),
         tenant_quota_collection_rejections_total: state
             .metrics
             .tenant_quota_collection_rejections_total

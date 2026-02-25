@@ -11,6 +11,12 @@ Metrics come from:
 - `GET /metrics` (JSON)
 - `GET /metrics/prometheus` (Prometheus exposition format)
 
+## Packaged Artifacts
+
+Versioned ops files are provided in this repository:
+- Prometheus alert rules: `ops/prometheus/aionbd-alerts.yml`
+- Grafana dashboard: `ops/grafana/aionbd-overview.json`
+
 ## Recommended SLOs
 
 These are starter values. Tune them after collecting real traffic data.

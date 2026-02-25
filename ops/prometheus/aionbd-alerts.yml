@@ -1,0 +1,82 @@
+groups:
+  - name: aionbd-alerts
+    rules:
+      - alert: AionbdNotReady
+        expr: aionbd_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIONBD is not ready"
+          description: "Readiness stayed down for more than 2 minutes."
+
+      - alert: AionbdHigh5xxRatio
+        expr: |
+          (
+            rate(aionbd_http_requests_5xx_total[5m])
+            /
+            clamp_min(rate(aionbd_http_requests_total[5m]), 1)
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIONBD 5xx ratio above 1%"
+          description: "Server error ratio stayed above target over 10 minutes."
+
+      - alert: AionbdStorageUnavailable
+        expr: aionbd_storage_available == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIONBD storage unavailable"
+          description: "Persistence layer is reporting unavailable state."
+
+      - alert: AionbdCheckpointDegraded
+        expr: rate(aionbd_persistence_checkpoint_degraded_total[5m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD persistence running in WAL-only degraded mode"
+          description: "Checkpointing keeps degrading; investigate disk and snapshot path health."
+
+      - alert: AionbdIndexBuildFailing
+        expr: rate(aionbd_l2_index_build_failures[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD IVF index builds are failing"
+          description: "Asynchronous L2 index build failures detected."
+
+      - alert: AionbdAuthFailures
+        expr: rate(aionbd_auth_failures_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD authentication failures observed"
+          description: "Invalid credentials or missing auth headers are being rejected."
+
+      - alert: AionbdRateLimitPressure
+        expr: rate(aionbd_rate_limit_rejections_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD request rate limiting active"
+          description: "Tenant request traffic exceeds configured rate limits."
+
+      - alert: AionbdTenantQuotaPressure
+        expr: |
+          rate(aionbd_tenant_quota_collection_rejections_total[10m]) > 0
+          or
+          rate(aionbd_tenant_quota_point_rejections_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD tenant quota pressure"
+          description: "Writes are being rejected by tenant collection/point quotas."

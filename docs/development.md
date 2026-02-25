@@ -94,6 +94,11 @@ AIONBD_BENCH_SCENARIO=search_quality cargo run --release -p aionbd-bench
 - `GET /collections/:name/points/:id`: read point
 - `DELETE /collections/:name/points/:id`: delete point
 
+## Ops artifacts
+
+- Prometheus alert rules: `ops/prometheus/aionbd-alerts.yml`
+- Grafana dashboard: `ops/grafana/aionbd-overview.json`
+
 ## Python SDK commands
 
 From `sdk/python/`:

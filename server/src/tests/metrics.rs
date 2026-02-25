@@ -106,6 +106,9 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["l2_indexes"], 0);
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_writes"], 0);
+    assert_eq!(payload["auth_failures_total"], 0);
+    assert_eq!(payload["rate_limit_rejections_total"], 0);
+    assert!(payload["audit_events_total"].as_u64().unwrap_or(0) >= 1);
     assert_eq!(payload["tenant_quota_collection_rejections_total"], 0);
     assert_eq!(payload["tenant_quota_point_rejections_total"], 0);
     assert!(payload["uptime_ms"].as_u64().is_some());
@@ -144,6 +147,18 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
         .metrics
         .http_request_duration_us_max
         .store(500, Ordering::Relaxed);
+    state
+        .metrics
+        .auth_failures_total
+        .store(11, Ordering::Relaxed);
+    state
+        .metrics
+        .rate_limit_rejections_total
+        .store(12, Ordering::Relaxed);
+    state
+        .metrics
+        .audit_events_total
+        .store(13, Ordering::Relaxed);
     state.metrics.persistence_writes.store(9, Ordering::Relaxed);
     let app = build_app(state);
 
@@ -186,5 +201,8 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
             .unwrap_or(-1.0)
             >= 0.0
     );
+    assert_eq!(payload["auth_failures_total"], 11);
+    assert_eq!(payload["rate_limit_rejections_total"], 12);
+    assert_eq!(payload["audit_events_total"], 13);
     assert_eq!(payload["persistence_writes"], 9);
 }

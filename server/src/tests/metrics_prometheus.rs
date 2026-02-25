@@ -102,6 +102,9 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_storage_available 1"));
     assert!(payload.contains("aionbd_persistence_enabled 0"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
+    assert!(payload.contains("aionbd_auth_failures_total 0"));
+    assert!(payload.contains("aionbd_rate_limit_rejections_total 0"));
+    assert!(payload.contains("aionbd_audit_events_total "));
     assert!(payload.contains("aionbd_tenant_quota_collection_rejections_total 0"));
     assert!(payload.contains("aionbd_tenant_quota_point_rejections_total 0"));
     assert!(payload.contains("# TYPE aionbd_persistence_writes counter"));
@@ -142,6 +145,15 @@ async fn metrics_prometheus_reflects_runtime_flags() {
         .store(999_999, Ordering::Relaxed);
     state
         .metrics
+        .auth_failures_total
+        .store(3, Ordering::Relaxed);
+    state
+        .metrics
+        .rate_limit_rejections_total
+        .store(4, Ordering::Relaxed);
+    state.metrics.audit_events_total.store(5, Ordering::Relaxed);
+    state
+        .metrics
         .persistence_writes
         .store(12, Ordering::Relaxed);
     let app = build_app(state);
@@ -171,4 +183,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_engine_loaded 0"));
     assert!(payload.contains("aionbd_storage_available 0"));
     assert!(payload.contains("aionbd_persistence_writes 12"));
+    assert!(payload.contains("aionbd_auth_failures_total 3"));
+    assert!(payload.contains("aionbd_rate_limit_rejections_total 4"));
+    assert!(payload.contains("aionbd_audit_events_total 5"));
 }
