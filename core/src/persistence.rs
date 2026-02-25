@@ -228,3 +228,5 @@ pub fn apply_wal_record(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_chaos;

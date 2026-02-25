@@ -27,6 +27,7 @@ Full local verification:
 ./scripts/verify_local.sh
 ./scripts/verify_local.sh --fast
 ./scripts/verify_local.sh --changed
+./scripts/verify_chaos.sh
 ```
 
 Run API:

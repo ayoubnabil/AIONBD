@@ -16,6 +16,7 @@ if [[ "$mode" == "--help" || "$mode" == "-h" ]]; then
   echo "Default: full workspace checks."
   echo "--fast: reduced Rust scope for quicker local iteration."
   echo "--changed: run only checks impacted by currently changed files."
+  echo "For persistence chaos checks, run: ./scripts/verify_chaos.sh"
   exit 0
 fi
 

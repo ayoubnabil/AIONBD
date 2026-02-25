@@ -21,3 +21,5 @@ jobs:
         run: ./scripts/check_file_sizes.sh
       - name: Unified verification
         run: ./scripts/verify_local.sh
+      - name: Chaos persistence verification
+        run: ./scripts/verify_chaos.sh
