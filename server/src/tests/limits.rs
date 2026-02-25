@@ -5,7 +5,6 @@ use tower::ServiceExt;
 
 use crate::build_app;
 use crate::config::AppConfig;
-use crate::handler_utils::remove_collection_write_lock;
 use crate::state::AppState;
 
 fn test_state(max_page_limit: usize, max_topk_limit: usize) -> AppState {
@@ -53,54 +52,6 @@ async fn create_collection_rejects_dimension_above_configured_maximum() {
         .expect("response should be available");
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
-async fn unknown_collection_writes_do_not_grow_lock_map() {
-    let state = test_state(1_000, 1_000);
-    let app = build_app(state.clone());
-
-    let before = state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .len();
-
-    for suffix in 0..24usize {
-        let upsert_req = Request::builder()
-            .method("PUT")
-            .uri(format!("/collections/missing_{suffix}/points/1"))
-            .header("content-type", "application/json")
-            .body(Body::from(json!({"values": [1.0, 2.0]}).to_string()))
-            .expect("request must build");
-        let upsert_resp = app
-            .clone()
-            .oneshot(upsert_req)
-            .await
-            .expect("response expected");
-        assert_eq!(upsert_resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    for suffix in 0..24usize {
-        let delete_req = Request::builder()
-            .method("DELETE")
-            .uri(format!("/collections/missing_{suffix}/points/1"))
-            .body(Body::empty())
-            .expect("request must build");
-        let delete_resp = app
-            .clone()
-            .oneshot(delete_req)
-            .await
-            .expect("response expected");
-        assert_eq!(delete_resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    let after = state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .len();
-    assert_eq!(before, after);
 }
 
 #[tokio::test]
@@ -231,36 +182,4 @@ async fn search_top_k_uses_capped_default_limit_when_limit_is_omitted() {
         1
     );
     assert_eq!(payload["hits"][0]["id"], 1);
-}
-
-#[test]
-fn remove_collection_write_lock_keeps_shared_lock_and_removes_when_idle() {
-    let state = test_state(1_000, 1_000);
-    let name = "demo";
-
-    let shared_lock = {
-        let mut locks = state
-            .collection_write_locks
-            .lock()
-            .expect("collection lock map should be available");
-        let lock = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
-        let cloned = lock.clone();
-        locks.insert(name.to_string(), lock);
-        cloned
-    };
-
-    remove_collection_write_lock(&state, name).expect("lock removal should not fail");
-    assert!(state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .contains_key(name));
-
-    drop(shared_lock);
-    remove_collection_write_lock(&state, name).expect("lock removal should not fail");
-    assert!(!state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .contains_key(name));
 }

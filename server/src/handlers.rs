@@ -70,6 +70,8 @@ pub(crate) async fn create_collection(
                 .metrics
                 .tenant_quota_collection_rejections_total
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            drop(collection_guard);
+            let _ = remove_collection_write_lock(&state, &name);
             return Err(ApiError::resource_exhausted(format!(
                 "tenant collection limit exceeded ({})",
                 state.auth_config.tenant_max_collections
@@ -93,10 +95,13 @@ pub(crate) async fn create_collection(
     }
 
     {
-        let mut collections = state
-            .collections
-            .write()
-            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        let mut collections = state.collections.write().map_err(|_| {
+            state
+                .engine_loaded
+                .store(false, std::sync::atomic::Ordering::Relaxed);
+            let _ = remove_collection_write_lock(&state, &name);
+            ApiError::internal("in-memory state update failed after wal append; restart required")
+        })?;
         collections.insert(name, handle);
     }
 
@@ -190,10 +195,12 @@ pub(crate) async fn delete_collection(
 
     persist_change_if_enabled(&state, &WalRecord::DeleteCollection { name: name.clone() }).await?;
     {
-        let mut collections = state
-            .collections
-            .write()
-            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        let mut collections = state.collections.write().map_err(|_| {
+            state
+                .engine_loaded
+                .store(false, std::sync::atomic::Ordering::Relaxed);
+            ApiError::internal("in-memory state update failed after wal append; restart required")
+        })?;
         let _ = collections.remove(&name);
     }
     drop(collection_guard);

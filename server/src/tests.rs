@@ -14,6 +14,7 @@ mod filtering;
 mod http_metrics;
 mod index_cache;
 mod limits;
+mod limits_locking;
 mod list_points;
 mod list_points_offset;
 mod metrics;
