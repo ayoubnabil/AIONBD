@@ -7,7 +7,10 @@ use super::TenantContext;
 
 const RATE_WINDOW_RETENTION_MINUTES: u64 = 60;
 
-pub(super) fn enforce_rate_limit(state: &AppState, tenant: &TenantContext) -> Result<(), ApiError> {
+pub(super) async fn enforce_rate_limit(
+    state: &AppState,
+    tenant: &TenantContext,
+) -> Result<(), ApiError> {
     let limit = state.auth_config.rate_limit_per_minute;
     if limit == 0 {
         return Ok(());
@@ -19,10 +22,7 @@ pub(super) fn enforce_rate_limit(state: &AppState, tenant: &TenantContext) -> Re
         .as_secs()
         / 60;
 
-    let mut windows = state
-        .tenant_rate_windows
-        .lock()
-        .map_err(|_| ApiError::internal("tenant rate limit lock poisoned"))?;
+    let mut windows = state.tenant_rate_windows.lock().await;
     windows.retain(|_, window| {
         now_minute.saturating_sub(window.minute) <= RATE_WINDOW_RETENTION_MINUTES
     });

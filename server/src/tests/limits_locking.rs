@@ -33,11 +33,7 @@ async fn unknown_collection_writes_do_not_grow_lock_map() {
     let state = test_state();
     let app = build_app(state.clone());
 
-    let before = state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .len();
+    let before = state.collection_write_locks.lock().await.len();
 
     for suffix in 0..24usize {
         let upsert_req = Request::builder()
@@ -68,11 +64,7 @@ async fn unknown_collection_writes_do_not_grow_lock_map() {
         assert_eq!(delete_resp.status(), StatusCode::NOT_FOUND);
     }
 
-    let after = state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .len();
+    let after = state.collection_write_locks.lock().await.len();
     assert_eq!(before, after);
 }
 
@@ -105,11 +97,7 @@ async fn rejected_create_by_quota_does_not_grow_lock_map() {
         .expect("response expected");
     assert_eq!(create_resp.status(), StatusCode::OK);
 
-    let before = state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .len();
+    let before = state.collection_write_locks.lock().await.len();
 
     for suffix in 0..16usize {
         let req = Request::builder()
@@ -124,42 +112,31 @@ async fn rejected_create_by_quota_does_not_grow_lock_map() {
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
     }
 
-    let after = state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .len();
+    let after = state.collection_write_locks.lock().await.len();
     assert_eq!(before, after);
 }
 
-#[test]
-fn remove_collection_write_lock_keeps_shared_lock_and_removes_when_idle() {
+#[tokio::test]
+async fn remove_collection_write_lock_keeps_shared_lock_and_removes_when_idle() {
     let state = test_state();
     let name = "demo";
 
     let shared_lock = {
-        let mut locks = state
-            .collection_write_locks
-            .lock()
-            .expect("collection lock map should be available");
+        let mut locks = state.collection_write_locks.lock().await;
         let lock = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
         let cloned = lock.clone();
         locks.insert(name.to_string(), lock);
         cloned
     };
 
-    remove_collection_write_lock(&state, name).expect("lock removal should not fail");
-    assert!(state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .contains_key(name));
+    remove_collection_write_lock(&state, name)
+        .await
+        .expect("lock removal should not fail");
+    assert!(state.collection_write_locks.lock().await.contains_key(name));
 
     drop(shared_lock);
-    remove_collection_write_lock(&state, name).expect("lock removal should not fail");
-    assert!(!state
-        .collection_write_locks
-        .lock()
-        .expect("collection lock map should be available")
-        .contains_key(name));
+    remove_collection_write_lock(&state, name)
+        .await
+        .expect("lock removal should not fail");
+    assert!(!state.collection_write_locks.lock().await.contains_key(name));
 }

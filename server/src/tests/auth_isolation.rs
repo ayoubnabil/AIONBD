@@ -177,17 +177,13 @@ async fn rate_limit_windows_are_pruned() {
         auth_config,
     );
 
-    state
-        .tenant_rate_windows
-        .lock()
-        .expect("tenant rate windows should be lockable")
-        .insert(
-            "stale".to_string(),
-            TenantRateWindow {
-                minute: 0,
-                count: 1,
-            },
-        );
+    state.tenant_rate_windows.lock().await.insert(
+        "stale".to_string(),
+        TenantRateWindow {
+            minute: 0,
+            count: 1,
+        },
+    );
 
     let app = build_app(state.clone());
     let response = app
@@ -201,10 +197,7 @@ async fn rate_limit_windows_are_pruned() {
         .expect("response expected");
     assert_eq!(response.status(), StatusCode::OK);
 
-    let windows = state
-        .tenant_rate_windows
-        .lock()
-        .expect("tenant rate windows should be lockable");
+    let windows = state.tenant_rate_windows.lock().await;
     assert!(!windows.contains_key("stale"));
     assert!(windows.contains_key("tenant_a"));
 }

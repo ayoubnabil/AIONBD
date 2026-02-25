@@ -128,7 +128,7 @@ pub(crate) fn collection_handle_by_name(
         .ok_or_else(|| ApiError::not_found(format!("collection '{canonical_name}' not found")))
 }
 
-pub(crate) fn collection_write_lock(
+pub(crate) async fn collection_write_lock(
     state: &AppState,
     canonical_name: &str,
 ) -> Result<Arc<Semaphore>, ApiError> {
@@ -137,10 +137,7 @@ pub(crate) fn collection_write_lock(
     // 2) per-collection semaphore permit from this map (held across mutation + persistence)
     // 3) registry/collection RwLocks
     // Never acquire these in reverse order.
-    let mut locks = state
-        .collection_write_locks
-        .lock()
-        .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+    let mut locks = state.collection_write_locks.lock().await;
     Ok(Arc::clone(
         locks
             .entry(canonical_name.to_string())
@@ -148,15 +145,12 @@ pub(crate) fn collection_write_lock(
     ))
 }
 
-pub(crate) fn existing_collection_write_lock(
+pub(crate) async fn existing_collection_write_lock(
     state: &AppState,
     canonical_name: &str,
 ) -> Result<Arc<Semaphore>, ApiError> {
     {
-        let locks = state
-            .collection_write_locks
-            .lock()
-            .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+        let locks = state.collection_write_locks.lock().await;
         if let Some(lock) = locks.get(canonical_name) {
             return Ok(Arc::clone(lock));
         }
@@ -174,10 +168,7 @@ pub(crate) fn existing_collection_write_lock(
         }
     }
 
-    let mut locks = state
-        .collection_write_locks
-        .lock()
-        .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+    let mut locks = state.collection_write_locks.lock().await;
     Ok(Arc::clone(
         locks
             .entry(canonical_name.to_string())
@@ -185,14 +176,11 @@ pub(crate) fn existing_collection_write_lock(
     ))
 }
 
-pub(crate) fn remove_collection_write_lock(
+pub(crate) async fn remove_collection_write_lock(
     state: &AppState,
     canonical_name: &str,
 ) -> Result<(), ApiError> {
-    let mut locks = state
-        .collection_write_locks
-        .lock()
-        .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+    let mut locks = state.collection_write_locks.lock().await;
     let should_remove = locks
         .get(canonical_name)
         .is_some_and(|lock| Arc::strong_count(lock) == 1);

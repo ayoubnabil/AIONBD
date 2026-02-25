@@ -226,7 +226,7 @@ pub(crate) async fn auth_rate_limit_audit(
         }
     };
 
-    if let Err(error) = enforce_rate_limit(&state, &tenant) {
+    if let Err(error) = enforce_rate_limit(&state, &tenant).await {
         let _ = state
             .metrics
             .rate_limit_rejections_total

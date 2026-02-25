@@ -2,12 +2,11 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::RwLock;
 use std::time::Instant;
 
 use aionbd_core::Collection;
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 
 use crate::auth::AuthConfig;
 use crate::config::AppConfig;

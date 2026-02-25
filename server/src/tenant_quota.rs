@@ -14,10 +14,7 @@ pub(crate) async fn acquire_tenant_quota_guard(
 ) -> Result<OwnedSemaphorePermit, ApiError> {
     let tenant_key = tenant.tenant_key().to_string();
     let semaphore = {
-        let mut locks = state
-            .tenant_quota_locks
-            .lock()
-            .map_err(|_| ApiError::internal("tenant quota lock map poisoned"))?;
+        let mut locks = state.tenant_quota_locks.lock().await;
         locks.retain(|key, lock| key == &tenant_key || Arc::strong_count(lock) > 1);
         Arc::clone(
             locks

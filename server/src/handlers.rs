@@ -49,7 +49,8 @@ pub(crate) async fn create_collection(
     let handle = std::sync::Arc::new(std::sync::RwLock::new(collection));
 
     let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
-    let collection_guard = collection_write_lock(&state, &name)?
+    let collection_guard = collection_write_lock(&state, &name)
+        .await?
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
@@ -67,7 +68,7 @@ pub(crate) async fn create_collection(
                 .tenant_quota_collection_rejections_total
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             drop(collection_guard);
-            let _ = remove_collection_write_lock(&state, &name);
+            let _ = remove_collection_write_lock(&state, &name).await;
             return Err(ApiError::resource_exhausted(format!(
                 "tenant collection limit exceeded ({})",
                 state.auth_config.tenant_max_collections
@@ -86,19 +87,22 @@ pub(crate) async fn create_collection(
     .await
     {
         drop(collection_guard);
-        let _ = remove_collection_write_lock(&state, &name);
+        let _ = remove_collection_write_lock(&state, &name).await;
         return Err(error);
     }
 
-    insert_collection(state.clone(), name.clone(), handle)
+    if insert_collection(state.clone(), name.clone(), handle)
         .await
-        .map_err(|_| {
-            state
-                .engine_loaded
-                .store(false, std::sync::atomic::Ordering::Relaxed);
-            let _ = remove_collection_write_lock(&state, &name);
-            ApiError::internal("in-memory state update failed after wal append; restart required")
-        })?;
+        .is_err()
+    {
+        state
+            .engine_loaded
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        let _ = remove_collection_write_lock(&state, &name).await;
+        return Err(ApiError::internal(
+            "in-memory state update failed after wal append; restart required",
+        ));
+    }
 
     Ok(Json(CollectionResponse {
         name: response_name,
@@ -171,7 +175,8 @@ pub(crate) async fn delete_collection(
     let response_name = canonical_collection_name(&name)?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
-    let collection_guard = existing_collection_write_lock(&state, &name)?
+    let collection_guard = existing_collection_write_lock(&state, &name)
+        .await?
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
@@ -192,7 +197,7 @@ pub(crate) async fn delete_collection(
             ApiError::internal("in-memory state update failed after wal append; restart required")
         })?;
     drop(collection_guard);
-    let _ = remove_collection_write_lock(&state, &name);
+    let _ = remove_collection_write_lock(&state, &name).await;
 
     Ok(Json(DeleteCollectionResponse {
         name: response_name,
@@ -209,7 +214,8 @@ pub(crate) async fn upsert_point(
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
     let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
-    let _collection_guard = existing_collection_write_lock(&state, &name)?
+    let _collection_guard = existing_collection_write_lock(&state, &name)
+        .await?
         .acquire_owned()
         .await
         .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
