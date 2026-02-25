@@ -2,13 +2,16 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use aionbd_core::{
-    append_wal_record_with_sync, checkpoint_wal, PersistOutcome, PersistenceError, WalRecord,
+    append_wal_record_with_sync, checkpoint_wal_with_policy, CheckpointPolicy, PersistOutcome,
+    PersistenceError, WalRecord,
 };
 use tokio::task;
 
 use crate::errors::ApiError;
 use crate::index_manager::remove_l2_index_entry;
 use crate::state::AppState;
+
+const CHECKPOINT_COMPACT_AFTER: usize = 64;
 
 pub(crate) async fn persist_change_if_enabled(
     state: &AppState,
@@ -44,8 +47,19 @@ pub(crate) async fn persist_change_if_enabled(
 
     let snapshot_path = state.config.snapshot_path.clone();
     let wal_path = state.config.wal_path.clone();
-    match run_serialized_persistence_io(state, move || checkpoint_wal(&snapshot_path, &wal_path))
-        .await
+    let checkpoint_policy = CheckpointPolicy {
+        incremental_compact_after: CHECKPOINT_COMPACT_AFTER,
+    };
+    match run_serialized_persistence_io(state, move || {
+        checkpoint_wal_with_policy(&snapshot_path, &wal_path, checkpoint_policy)
+            .map(|_| PersistOutcome::Checkpointed)
+            .or_else(|error| {
+                Ok(PersistOutcome::WalOnly {
+                    reason: error.to_string(),
+                })
+            })
+    })
+    .await
     {
         Ok(PersistOutcome::Checkpointed) => {
             state.storage_available.store(true, Ordering::Relaxed);

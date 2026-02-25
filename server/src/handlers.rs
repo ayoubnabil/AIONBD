@@ -14,8 +14,8 @@ use crate::handler_utils::{
 pub(crate) use crate::handlers_health::{distance, live, ready};
 use crate::index_manager::remove_l2_index_entry;
 use crate::models::{
-    CollectionResponse, CreateCollectionRequest, DeleteCollectionResponse, DeletePointResponse,
-    ListCollectionsResponse, PointResponse, UpsertPointRequest, UpsertPointResponse,
+    CollectionResponse, CreateCollectionRequest, DeleteCollectionResponse, ListCollectionsResponse,
+    UpsertPointRequest, UpsertPointResponse,
 };
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
@@ -221,71 +221,14 @@ pub(crate) async fn upsert_point(
         .write()
         .map_err(|_| ApiError::internal("collection lock poisoned"))?
         .upsert_point_with_payload(id, values, payload_values)
-        .map_err(map_collection_error)?;
+        .map_err(|error| {
+            state
+                .engine_loaded
+                .store(false, std::sync::atomic::Ordering::Relaxed);
+            tracing::error!(collection = %name, point_id = id, %error, "in-memory upsert failed after wal append");
+            ApiError::internal("in-memory state update failed after wal append; restart required")
+        })?;
     remove_l2_index_entry(&state, &name);
 
     Ok(Json(UpsertPointResponse { id, created }))
-}
-
-pub(crate) async fn get_point(
-    Path((name, id)): Path<(String, u64)>,
-    State(state): State<AppState>,
-    Extension(tenant): Extension<TenantContext>,
-) -> Result<Json<PointResponse>, ApiError> {
-    let (_, handle) = collection_handle(&state, &name, &tenant)?;
-    let collection = handle
-        .read()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-    let (values, payload) = collection
-        .get_point_record(id)
-        .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?;
-
-    Ok(Json(PointResponse {
-        id,
-        values: values.to_vec(),
-        payload: payload.clone(),
-    }))
-}
-
-pub(crate) async fn delete_point(
-    Path((name, id)): Path<(String, u64)>,
-    State(state): State<AppState>,
-    Extension(tenant): Extension<TenantContext>,
-) -> Result<Json<DeletePointResponse>, ApiError> {
-    let name = scoped_collection_name(&state, &name, &tenant)?;
-    let _collection_guard = existing_collection_write_lock(&state, &name)?
-        .acquire_owned()
-        .await
-        .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
-    let handle = collection_handle_by_name(&state, &name)?;
-
-    {
-        let collection = handle
-            .read()
-            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
-        if collection.get_point(id).is_none() {
-            return Err(ApiError::not_found(format!("point '{id}' not found")));
-        }
-    }
-
-    persist_change_if_enabled(
-        &state,
-        &WalRecord::DeletePoint {
-            collection: name.clone(),
-            id,
-        },
-    )
-    .await?;
-
-    let deleted = handle
-        .write()
-        .map_err(|_| ApiError::internal("collection lock poisoned"))?
-        .remove_point(id)
-        .is_some();
-    if !deleted {
-        return Err(ApiError::not_found(format!("point '{id}' not found")));
-    }
-    remove_l2_index_entry(&state, &name);
-
-    Ok(Json(DeletePointResponse { id, deleted: true }))
 }

@@ -55,7 +55,6 @@ pub fn checkpoint_wal(
 ) -> Result<PersistOutcome, PersistenceError> {
     let policy = CheckpointPolicy::default();
     checkpoint_wal_with_policy(snapshot_path, wal_path, policy)
-        .and_then(|_| maybe_compact_incrementals_from_persisted_state(snapshot_path, policy))
         .map(|_| PersistOutcome::Checkpointed)
         .or_else(|error| {
             Ok(PersistOutcome::WalOnly {
@@ -67,9 +66,10 @@ pub fn checkpoint_wal(
 pub fn checkpoint_wal_with_policy(
     snapshot_path: &Path,
     wal_path: &Path,
-    _policy: CheckpointPolicy,
+    policy: CheckpointPolicy,
 ) -> Result<(), PersistenceError> {
     let _ = rotate_wal_to_incremental(snapshot_path, wal_path)?;
+    maybe_compact_incrementals_from_persisted_state(snapshot_path, policy)?;
     Ok(())
 }
 

@@ -1,10 +1,19 @@
+use aionbd_core::WalRecord;
 use axum::extract::{Extension, Path, Query, State};
 use axum::Json;
 
 use crate::auth::TenantContext;
 use crate::errors::ApiError;
-use crate::handler_utils::collection_handle;
-use crate::models::{ListPointsQuery, ListPointsResponse, PointIdResponse, DEFAULT_PAGE_LIMIT};
+use crate::handler_utils::{
+    collection_handle, collection_handle_by_name, existing_collection_write_lock,
+    scoped_collection_name,
+};
+use crate::index_manager::remove_l2_index_entry;
+use crate::models::{
+    DeletePointResponse, ListPointsQuery, ListPointsResponse, PointIdResponse, PointResponse,
+    DEFAULT_PAGE_LIMIT,
+};
+use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 
 const MAX_OFFSET_SCAN: usize = 100_000;
@@ -70,4 +79,73 @@ pub(crate) async fn list_points(
         next_offset,
         next_after_id,
     }))
+}
+
+pub(crate) async fn get_point(
+    Path((name, id)): Path<(String, u64)>,
+    State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
+) -> Result<Json<PointResponse>, ApiError> {
+    let (_, handle) = collection_handle(&state, &name, &tenant)?;
+    let collection = handle
+        .read()
+        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+    let (values, payload) = collection
+        .get_point_record(id)
+        .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?;
+
+    Ok(Json(PointResponse {
+        id,
+        values: values.to_vec(),
+        payload: payload.clone(),
+    }))
+}
+
+pub(crate) async fn delete_point(
+    Path((name, id)): Path<(String, u64)>,
+    State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
+) -> Result<Json<DeletePointResponse>, ApiError> {
+    let name = scoped_collection_name(&state, &name, &tenant)?;
+    let _collection_guard = existing_collection_write_lock(&state, &name)?
+        .acquire_owned()
+        .await
+        .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
+    let handle = collection_handle_by_name(&state, &name)?;
+
+    {
+        let collection = handle
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        if collection.get_point(id).is_none() {
+            return Err(ApiError::not_found(format!("point '{id}' not found")));
+        }
+    }
+
+    persist_change_if_enabled(
+        &state,
+        &WalRecord::DeletePoint {
+            collection: name.clone(),
+            id,
+        },
+    )
+    .await?;
+
+    let deleted = handle
+        .write()
+        .map_err(|_| ApiError::internal("collection lock poisoned"))?
+        .remove_point(id)
+        .is_some();
+    if !deleted {
+        state
+            .engine_loaded
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        tracing::error!(collection = %name, point_id = id, "in-memory delete failed after wal append");
+        return Err(ApiError::internal(
+            "in-memory state update failed after wal append; restart required",
+        ));
+    }
+    remove_l2_index_entry(&state, &name);
+
+    Ok(Json(DeletePointResponse { id, deleted: true }))
 }

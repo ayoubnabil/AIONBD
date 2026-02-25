@@ -55,11 +55,11 @@ use crate::auth::{auth_rate_limit_audit, AuthConfig};
 use crate::config::AppConfig;
 use crate::errors::handle_middleware_error;
 use crate::handlers::{
-    create_collection, delete_collection, delete_point, distance, get_collection, get_point,
-    list_collections, live, ready, upsert_point,
+    create_collection, delete_collection, distance, get_collection, list_collections, live, ready,
+    upsert_point,
 };
 use crate::handlers_metrics::{metrics, metrics_prometheus};
-use crate::handlers_points::list_points;
+use crate::handlers_points::{delete_point, get_point, list_points};
 use crate::handlers_search::{search_collection, search_collection_top_k};
 use crate::http_metrics::track_http_metrics;
 use crate::index_manager::warmup_l2_indexes;
