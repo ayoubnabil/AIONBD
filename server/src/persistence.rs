@@ -1,20 +1,26 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::OnceLock;
 
 use aionbd_core::{
-    append_wal_record_with_sync, checkpoint_wal_with_policy, CheckpointPolicy, PersistOutcome,
-    PersistenceError, WalRecord,
+    append_wal_record_with_sync, append_wal_records_with_sync, checkpoint_wal_with_policy,
+    CheckpointPolicy, PersistOutcome, PersistenceError, WalRecord,
 };
 use tokio::task;
 
 use crate::errors::ApiError;
 use crate::index_manager::{clear_l2_build_tracking, remove_l2_index_entry};
+use crate::persistence_queue::{PendingWalWrite, WalAppendResult};
 use crate::state::AppState;
 
-const CHECKPOINT_COMPACT_AFTER: usize = 64;
-const ASYNC_CHECKPOINTS_DEFAULT: bool = false;
-const WAL_SYNC_EVERY_N_DEFAULT: u64 = 0;
+mod settings;
+use settings::{
+    batch_should_sync, next_wal_sync_sequence, next_wal_sync_sequence_batch_start,
+    should_sync_this_write,
+};
+pub(crate) use settings::{
+    configured_async_checkpoints, configured_checkpoint_compact_after,
+    configured_wal_group_commit_max_batch, configured_wal_sync_every_n_writes,
+};
 
 pub(crate) async fn persist_change_if_enabled(
     state: &AppState,
@@ -25,21 +31,9 @@ pub(crate) async fn persist_change_if_enabled(
         return Ok(());
     }
 
-    let wal_path = state.config.wal_path.clone();
-    let wal_record = record.clone();
-    let sync_on_write = state.config.wal_sync_on_write;
-    let sync_every_n_writes = configured_wal_sync_every_n_writes();
-    if let Err(error) = run_serialized_persistence_io(state, move || {
-        append_wal_record_with_sync(
-            &wal_path,
-            &wal_record,
-            should_sync_this_write(sync_on_write, sync_every_n_writes, next_wal_sync_sequence()),
-        )
-    })
-    .await
-    {
+    if let Err(error) = append_wal_record_with_config(state, record.clone()).await {
         state.storage_available.store(false, Ordering::Relaxed);
-        tracing::error!(%error, "failed to append wal record");
+        tracing::error!(error = %error, "failed to append wal record");
         return Err(ApiError::internal("failed to persist state"));
     }
     invalidate_cached_l2_index(state, record);
@@ -80,6 +74,104 @@ where
     run_persistence_io(operation).await
 }
 
+async fn append_wal_record_with_config(state: &AppState, record: WalRecord) -> Result<(), String> {
+    let sync_on_write = state.config.wal_sync_on_write;
+    let sync_every_n_writes = configured_wal_sync_every_n_writes();
+    let max_batch = configured_wal_group_commit_max_batch();
+
+    if max_batch <= 1 {
+        let wal_path = state.config.wal_path.clone();
+        return run_serialized_persistence_io(state, move || {
+            append_wal_record_with_sync(
+                &wal_path,
+                &record,
+                should_sync_this_write(
+                    sync_on_write,
+                    sync_every_n_writes,
+                    next_wal_sync_sequence(),
+                ),
+            )
+        })
+        .await
+        .map_err(|error| error.to_string());
+    }
+
+    append_wal_record_grouped(state, record, sync_on_write, sync_every_n_writes, max_batch).await
+}
+
+async fn append_wal_record_grouped(
+    state: &AppState,
+    record: WalRecord,
+    sync_on_write: bool,
+    sync_every_n_writes: u64,
+    max_batch: usize,
+) -> Result<(), String> {
+    let (is_leader, response) = state.wal_group_queue.enqueue(record).await;
+    if is_leader {
+        run_wal_group_leader(state, sync_on_write, sync_every_n_writes, max_batch).await;
+    }
+    response
+        .await
+        .map_err(|_| "wal group commit response channel closed unexpectedly".to_string())?
+}
+
+async fn run_wal_group_leader(
+    state: &AppState,
+    sync_on_write: bool,
+    sync_every_n_writes: u64,
+    max_batch: usize,
+) {
+    loop {
+        let pending = state
+            .wal_group_queue
+            .take_batch_or_release_leader(max_batch)
+            .await;
+        if pending.is_empty() {
+            break;
+        }
+
+        let records_count = pending.len() as u64;
+        let (records, responses) = split_pending_writes(pending);
+        let seq_start = next_wal_sync_sequence_batch_start(records_count);
+        let should_sync =
+            batch_should_sync(sync_on_write, sync_every_n_writes, seq_start, records_count);
+        let wal_path = state.config.wal_path.clone();
+        let result: WalAppendResult = run_serialized_persistence_io(state, move || {
+            append_wal_records_with_sync(&wal_path, &records, should_sync)
+        })
+        .await
+        .map_err(|error| error.to_string());
+
+        let _ = state
+            .metrics
+            .persistence_wal_group_commits_total
+            .fetch_add(1, Ordering::Relaxed);
+        let _ = state
+            .metrics
+            .persistence_wal_grouped_records_total
+            .fetch_add(records_count, Ordering::Relaxed);
+
+        for response in responses {
+            let _ = response.send(result.clone());
+        }
+    }
+}
+
+fn split_pending_writes(
+    pending: Vec<PendingWalWrite>,
+) -> (
+    Vec<WalRecord>,
+    Vec<tokio::sync::oneshot::Sender<WalAppendResult>>,
+) {
+    let mut records = Vec::with_capacity(pending.len());
+    let mut responses = Vec::with_capacity(pending.len());
+    for item in pending {
+        records.push(item.record);
+        responses.push(item.response);
+    }
+    (records, responses)
+}
+
 fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {
     match record {
         WalRecord::CreateCollection { name, .. } | WalRecord::DeleteCollection { name } => {
@@ -109,92 +201,6 @@ fn schedule_checkpoint_if_needed(state: &AppState) -> bool {
             .store(false, Ordering::Release);
     });
     true
-}
-
-pub(crate) fn configured_async_checkpoints() -> bool {
-    static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| {
-        let Ok(raw) = std::env::var("AIONBD_ASYNC_CHECKPOINTS") else {
-            return ASYNC_CHECKPOINTS_DEFAULT;
-        };
-        match raw.trim().to_ascii_lowercase().as_str() {
-            "1" | "true" | "yes" | "on" => true,
-            "0" | "false" | "no" | "off" => false,
-            _ => {
-                tracing::warn!(
-                    %raw,
-                    default = ASYNC_CHECKPOINTS_DEFAULT,
-                    "invalid AIONBD_ASYNC_CHECKPOINTS; using default"
-                );
-                ASYNC_CHECKPOINTS_DEFAULT
-            }
-        }
-    })
-}
-
-pub(crate) fn configured_checkpoint_compact_after() -> usize {
-    static COMPACT_AFTER: OnceLock<usize> = OnceLock::new();
-    *COMPACT_AFTER.get_or_init(|| {
-        let Ok(raw) = std::env::var("AIONBD_CHECKPOINT_COMPACT_AFTER") else {
-            return CHECKPOINT_COMPACT_AFTER;
-        };
-        match raw.parse::<usize>() {
-            Ok(0) => {
-                tracing::warn!(
-                    %raw,
-                    default = CHECKPOINT_COMPACT_AFTER,
-                    "AIONBD_CHECKPOINT_COMPACT_AFTER must be > 0; using default"
-                );
-                CHECKPOINT_COMPACT_AFTER
-            }
-            Ok(value) => value,
-            Err(error) => {
-                tracing::warn!(
-                    %raw,
-                    %error,
-                    default = CHECKPOINT_COMPACT_AFTER,
-                    "invalid AIONBD_CHECKPOINT_COMPACT_AFTER; using default"
-                );
-                CHECKPOINT_COMPACT_AFTER
-            }
-        }
-    })
-}
-
-pub(crate) fn configured_wal_sync_every_n_writes() -> u64 {
-    static EVERY_N_WRITES: OnceLock<u64> = OnceLock::new();
-    *EVERY_N_WRITES.get_or_init(|| {
-        let Ok(raw) = std::env::var("AIONBD_WAL_SYNC_EVERY_N_WRITES") else {
-            return WAL_SYNC_EVERY_N_DEFAULT;
-        };
-        match raw.parse::<u64>() {
-            Ok(value) => value,
-            Err(error) => {
-                tracing::warn!(
-                    %raw,
-                    %error,
-                    default = WAL_SYNC_EVERY_N_DEFAULT,
-                    "invalid AIONBD_WAL_SYNC_EVERY_N_WRITES; using default"
-                );
-                WAL_SYNC_EVERY_N_DEFAULT
-            }
-        }
-    })
-}
-
-fn next_wal_sync_sequence() -> u64 {
-    static WAL_WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
-    WAL_WRITE_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1
-}
-
-fn should_sync_this_write(sync_on_write: bool, sync_every_n_writes: u64, write_seq: u64) -> bool {
-    if sync_on_write {
-        return true;
-    }
-    if sync_every_n_writes == 0 {
-        return false;
-    }
-    write_seq.checked_rem(sync_every_n_writes) == Some(0)
 }
 
 async fn run_checkpoint(state: AppState) {
@@ -253,24 +259,4 @@ where
 
 fn is_checkpoint_due(writes_since_start: u64, checkpoint_interval: usize) -> bool {
     writes_since_start.checked_rem(checkpoint_interval as u64) == Some(0)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::should_sync_this_write;
-
-    #[test]
-    fn wal_sync_policy_prefers_explicit_sync_on_write() {
-        assert!(should_sync_this_write(true, 0, 1));
-        assert!(should_sync_this_write(true, 32, 7));
-    }
-
-    #[test]
-    fn wal_sync_policy_supports_periodic_sync_when_disabled() {
-        assert!(!should_sync_this_write(false, 0, 1));
-        assert!(!should_sync_this_write(false, 3, 1));
-        assert!(!should_sync_this_write(false, 3, 2));
-        assert!(should_sync_this_write(false, 3, 3));
-        assert!(should_sync_this_write(false, 3, 6));
-    }
 }

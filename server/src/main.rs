@@ -48,6 +48,7 @@ mod index_manager;
 mod ivf_index;
 mod models;
 mod persistence;
+mod persistence_queue;
 mod state;
 mod tenant_quota;
 #[cfg(test)]

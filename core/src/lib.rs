@@ -13,10 +13,10 @@ pub use collection::{
     PointRecord,
 };
 pub use persistence::{
-    append_wal_record, append_wal_record_with_sync, checkpoint_snapshot,
-    checkpoint_snapshot_with_policy, checkpoint_wal, checkpoint_wal_with_policy,
-    incremental_snapshot_dir, load_collections, persist_change, CheckpointPolicy, PersistOutcome,
-    PersistenceError, WalRecord,
+    append_wal_record, append_wal_record_with_sync, append_wal_records_with_sync,
+    checkpoint_snapshot, checkpoint_snapshot_with_policy, checkpoint_wal,
+    checkpoint_wal_with_policy, incremental_snapshot_dir, load_collections, persist_change,
+    CheckpointPolicy, PersistOutcome, PersistenceError, WalRecord,
 };
 pub use vector::{
     cosine_similarity, cosine_similarity_with_options, dot_product, dot_product_with_options,

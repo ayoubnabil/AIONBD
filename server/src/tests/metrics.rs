@@ -110,10 +110,13 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
     assert_eq!(payload["persistence_wal_sync_every_n_writes"], 0);
+    assert_eq!(payload["persistence_wal_group_commit_max_batch"], 16);
     assert_eq!(payload["persistence_async_checkpoints"], false);
     assert_eq!(payload["persistence_checkpoint_compact_after"], 64);
     assert_eq!(payload["persistence_writes"], 0);
     assert_eq!(payload["persistence_checkpoint_schedule_skips_total"], 0);
+    assert_eq!(payload["persistence_wal_group_commits_total"], 0);
+    assert_eq!(payload["persistence_wal_grouped_records_total"], 0);
     assert_eq!(payload["persistence_checkpoint_in_flight"], false);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);
@@ -198,6 +201,14 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
         .metrics
         .persistence_checkpoint_schedule_skips_total
         .store(4, Ordering::Relaxed);
+    state
+        .metrics
+        .persistence_wal_group_commits_total
+        .store(3, Ordering::Relaxed);
+    state
+        .metrics
+        .persistence_wal_grouped_records_total
+        .store(17, Ordering::Relaxed);
     let app = build_app(state);
 
     let metrics_req = Request::builder()
@@ -246,9 +257,12 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["persistence_checkpoint_in_flight"], true);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
     assert_eq!(payload["persistence_wal_sync_every_n_writes"], 0);
+    assert_eq!(payload["persistence_wal_group_commit_max_batch"], 16);
     assert_eq!(payload["persistence_async_checkpoints"], false);
     assert_eq!(payload["persistence_checkpoint_compact_after"], 64);
     assert_eq!(payload["persistence_checkpoint_schedule_skips_total"], 4);
+    assert_eq!(payload["persistence_wal_group_commits_total"], 3);
+    assert_eq!(payload["persistence_wal_grouped_records_total"], 17);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);
     assert_eq!(payload["persistence_incremental_segments"], 0);

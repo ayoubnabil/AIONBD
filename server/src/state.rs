@@ -12,6 +12,7 @@ use tokio::sync::{Mutex, Semaphore};
 use crate::auth::AuthConfig;
 use crate::config::AppConfig;
 use crate::ivf_index::IvfIndex;
+use crate::persistence_queue::WalGroupQueue;
 
 pub(crate) type CollectionHandle = Arc<RwLock<Collection>>;
 pub(crate) type CollectionRegistry = BTreeMap<String, CollectionHandle>;
@@ -52,6 +53,8 @@ pub(crate) struct MetricsState {
     pub(crate) persistence_checkpoint_success_total: AtomicU64,
     pub(crate) persistence_checkpoint_error_total: AtomicU64,
     pub(crate) persistence_checkpoint_schedule_skips_total: AtomicU64,
+    pub(crate) persistence_wal_group_commits_total: AtomicU64,
+    pub(crate) persistence_wal_grouped_records_total: AtomicU64,
 }
 
 #[derive(Clone)]
@@ -64,6 +67,7 @@ pub(crate) struct AppState {
     pub(crate) metrics: Arc<MetricsState>,
     pub(crate) persistence_io_serial: Arc<Semaphore>,
     pub(crate) persistence_checkpoint_in_flight: Arc<AtomicBool>,
+    pub(crate) wal_group_queue: Arc<WalGroupQueue>,
     pub(crate) collection_write_locks: Arc<Mutex<BTreeMap<String, Arc<Semaphore>>>>,
     pub(crate) l2_index_building: Arc<RwLock<BTreeSet<String>>>,
     pub(crate) l2_index_last_started_ms: Arc<StdMutex<BTreeMap<String, u64>>>,
@@ -105,6 +109,7 @@ impl AppState {
             metrics: Arc::new(MetricsState::default()),
             persistence_io_serial: Arc::new(Semaphore::new(1)),
             persistence_checkpoint_in_flight: Arc::new(AtomicBool::new(false)),
+            wal_group_queue: Arc::new(WalGroupQueue::new()),
             collection_write_locks: Arc::new(Mutex::new(collection_write_locks)),
             l2_index_building: Arc::new(RwLock::new(BTreeSet::new())),
             l2_index_last_started_ms: Arc::new(StdMutex::new(BTreeMap::new())),

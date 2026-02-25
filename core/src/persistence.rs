@@ -10,7 +10,7 @@ mod snapshot;
 mod wal;
 pub use incremental::{incremental_snapshot_dir, CheckpointPolicy};
 use snapshot::{load_snapshot, write_snapshot};
-use wal::{append_wal, replay_wal, truncate_wal};
+use wal::{append_wal, append_wal_batch, replay_wal, truncate_wal};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -111,6 +111,14 @@ pub fn append_wal_record_with_sync(
     sync_on_write: bool,
 ) -> Result<(), PersistenceError> {
     append_wal(wal_path, record, sync_on_write)
+}
+
+pub fn append_wal_records_with_sync(
+    wal_path: &Path,
+    records: &[WalRecord],
+    sync_on_write: bool,
+) -> Result<(), PersistenceError> {
+    append_wal_batch(wal_path, records, sync_on_write)
 }
 
 pub fn checkpoint_snapshot(
@@ -228,5 +236,7 @@ pub fn apply_wal_record(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_batch;
 #[cfg(test)]
 mod tests_chaos;

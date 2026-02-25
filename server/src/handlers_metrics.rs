@@ -16,7 +16,7 @@ use crate::index_manager::{
 use crate::models::MetricsResponse;
 use crate::persistence::{
     configured_async_checkpoints, configured_checkpoint_compact_after,
-    configured_wal_sync_every_n_writes,
+    configured_wal_group_commit_max_batch, configured_wal_sync_every_n_writes,
 };
 use crate::state::AppState;
 
@@ -161,6 +161,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
         persistence_enabled: state.config.persistence_enabled,
         persistence_wal_sync_on_write: state.config.wal_sync_on_write,
         persistence_wal_sync_every_n_writes: configured_wal_sync_every_n_writes(),
+        persistence_wal_group_commit_max_batch: configured_wal_group_commit_max_batch(),
         persistence_async_checkpoints: configured_async_checkpoints(),
         persistence_checkpoint_compact_after: configured_checkpoint_compact_after(),
         persistence_writes: state.metrics.persistence_writes.load(Ordering::Relaxed),
@@ -182,6 +183,14 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
         persistence_checkpoint_schedule_skips_total: state
             .metrics
             .persistence_checkpoint_schedule_skips_total
+            .load(Ordering::Relaxed),
+        persistence_wal_group_commits_total: state
+            .metrics
+            .persistence_wal_group_commits_total
+            .load(Ordering::Relaxed),
+        persistence_wal_grouped_records_total: state
+            .metrics
+            .persistence_wal_grouped_records_total
             .load(Ordering::Relaxed),
         persistence_wal_size_bytes,
         persistence_wal_tail_open,

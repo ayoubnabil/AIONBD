@@ -113,6 +113,9 @@ aionbd_persistence_wal_sync_on_write {}\n\
 # HELP aionbd_persistence_wal_sync_every_n_writes Periodic WAL fsync cadence when sync-on-write is disabled (0 means never).\n\
 # TYPE aionbd_persistence_wal_sync_every_n_writes gauge\n\
 aionbd_persistence_wal_sync_every_n_writes {}\n\
+# HELP aionbd_persistence_wal_group_commit_max_batch Maximum number of writes coalesced into one WAL group commit.\n\
+# TYPE aionbd_persistence_wal_group_commit_max_batch gauge\n\
+aionbd_persistence_wal_group_commit_max_batch {}\n\
 # HELP aionbd_persistence_async_checkpoints Persistence async checkpoint scheduling flag (1 enabled, 0 disabled).\n\
 # TYPE aionbd_persistence_async_checkpoints gauge\n\
 aionbd_persistence_async_checkpoints {}\n\
@@ -137,6 +140,12 @@ aionbd_persistence_checkpoint_error_total {}\n\
 # HELP aionbd_persistence_checkpoint_schedule_skips_total Total due checkpoints skipped because another checkpoint was already in flight.\n\
 # TYPE aionbd_persistence_checkpoint_schedule_skips_total counter\n\
 aionbd_persistence_checkpoint_schedule_skips_total {}\n\
+# HELP aionbd_persistence_wal_group_commits_total Total WAL commit operations executed by the group-commit writer.\n\
+# TYPE aionbd_persistence_wal_group_commits_total counter\n\
+aionbd_persistence_wal_group_commits_total {}\n\
+# HELP aionbd_persistence_wal_grouped_records_total Total WAL records processed by the group-commit writer.\n\
+# TYPE aionbd_persistence_wal_grouped_records_total counter\n\
+aionbd_persistence_wal_grouped_records_total {}\n\
 # HELP aionbd_persistence_wal_size_bytes Current WAL file size in bytes.\n\
 # TYPE aionbd_persistence_wal_size_bytes gauge\n\
 aionbd_persistence_wal_size_bytes {}\n\
@@ -198,6 +207,7 @@ aionbd_max_points_per_collection {}\n",
         bool_as_u8(metrics.persistence_enabled),
         bool_as_u8(metrics.persistence_wal_sync_on_write),
         metrics.persistence_wal_sync_every_n_writes,
+        metrics.persistence_wal_group_commit_max_batch,
         bool_as_u8(metrics.persistence_async_checkpoints),
         metrics.persistence_checkpoint_compact_after,
         metrics.persistence_writes,
@@ -206,6 +216,8 @@ aionbd_max_points_per_collection {}\n",
         metrics.persistence_checkpoint_success_total,
         metrics.persistence_checkpoint_error_total,
         metrics.persistence_checkpoint_schedule_skips_total,
+        metrics.persistence_wal_group_commits_total,
+        metrics.persistence_wal_grouped_records_total,
         metrics.persistence_wal_size_bytes,
         bool_as_u8(metrics.persistence_wal_tail_open),
         metrics.persistence_incremental_segments,

@@ -13,13 +13,26 @@ pub(super) fn append_wal(
     record: &WalRecord,
     sync_on_write: bool,
 ) -> Result<(), PersistenceError> {
+    append_wal_batch(path, std::slice::from_ref(record), sync_on_write)
+}
+
+pub(super) fn append_wal_batch(
+    path: &Path,
+    records: &[WalRecord],
+    sync_on_write: bool,
+) -> Result<(), PersistenceError> {
+    if records.is_empty() {
+        return Ok(());
+    }
     ensure_parent_dir(path)?;
 
     let existed = path.exists();
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-    let mut line = serde_json::to_vec(record)?;
-    line.push(b'\n');
-    file.write_all(&line)?;
+    for record in records {
+        let mut line = serde_json::to_vec(record)?;
+        line.push(b'\n');
+        file.write_all(&line)?;
+    }
     if sync_on_write {
         file.flush()?;
         file.sync_data()?;

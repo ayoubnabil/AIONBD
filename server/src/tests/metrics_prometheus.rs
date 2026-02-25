@@ -107,10 +107,13 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_persistence_enabled 0"));
     assert!(payload.contains("aionbd_persistence_wal_sync_on_write 1"));
     assert!(payload.contains("aionbd_persistence_wal_sync_every_n_writes 0"));
+    assert!(payload.contains("aionbd_persistence_wal_group_commit_max_batch 16"));
     assert!(payload.contains("aionbd_persistence_async_checkpoints 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_compact_after 64"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_schedule_skips_total 0"));
+    assert!(payload.contains("aionbd_persistence_wal_group_commits_total 0"));
+    assert!(payload.contains("aionbd_persistence_wal_grouped_records_total 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_in_flight 0"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
@@ -183,6 +186,14 @@ async fn metrics_prometheus_reflects_runtime_flags() {
         .persistence_checkpoint_schedule_skips_total
         .store(6, Ordering::Relaxed);
     state
+        .metrics
+        .persistence_wal_group_commits_total
+        .store(5, Ordering::Relaxed);
+    state
+        .metrics
+        .persistence_wal_grouped_records_total
+        .store(23, Ordering::Relaxed);
+    state
         .persistence_checkpoint_in_flight
         .store(true, Ordering::Relaxed);
     let app = build_app(state);
@@ -215,10 +226,13 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_storage_available 0"));
     assert!(payload.contains("aionbd_persistence_wal_sync_on_write 0"));
     assert!(payload.contains("aionbd_persistence_wal_sync_every_n_writes 0"));
+    assert!(payload.contains("aionbd_persistence_wal_group_commit_max_batch 16"));
     assert!(payload.contains("aionbd_persistence_async_checkpoints 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_compact_after 64"));
     assert!(payload.contains("aionbd_persistence_writes 12"));
     assert!(payload.contains("aionbd_persistence_checkpoint_schedule_skips_total 6"));
+    assert!(payload.contains("aionbd_persistence_wal_group_commits_total 5"));
+    assert!(payload.contains("aionbd_persistence_wal_grouped_records_total 23"));
     assert!(payload.contains("aionbd_persistence_checkpoint_in_flight 1"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
