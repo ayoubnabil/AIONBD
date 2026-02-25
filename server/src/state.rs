@@ -1,49 +1,99 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::RwLock;
 use std::time::Instant;
 
 use aionbd_core::Collection;
+use tokio::sync::Semaphore;
 
+use crate::auth::AuthConfig;
 use crate::config::AppConfig;
 use crate::ivf_index::IvfIndex;
 
+pub(crate) type CollectionHandle = Arc<RwLock<Collection>>;
+pub(crate) type CollectionRegistry = BTreeMap<String, CollectionHandle>;
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TenantRateWindow {
+    pub(crate) minute: u64,
+    pub(crate) count: u64,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct MetricsState {
+    pub(crate) http_requests_total: AtomicU64,
+    pub(crate) http_requests_in_flight: AtomicU64,
+    pub(crate) http_responses_2xx_total: AtomicU64,
+    pub(crate) http_responses_4xx_total: AtomicU64,
+    pub(crate) http_requests_5xx_total: AtomicU64,
+    pub(crate) http_request_duration_us_total: AtomicU64,
+    pub(crate) http_request_duration_us_max: AtomicU64,
+    pub(crate) persistence_writes: AtomicU64,
+    pub(crate) l2_index_cache_lookups: AtomicU64,
+    pub(crate) l2_index_cache_hits: AtomicU64,
+    pub(crate) l2_index_cache_misses: AtomicU64,
+    pub(crate) l2_index_build_requests: AtomicU64,
+    pub(crate) l2_index_build_successes: AtomicU64,
+    pub(crate) l2_index_build_failures: AtomicU64,
+    pub(crate) auth_failures_total: AtomicU64,
+    pub(crate) rate_limit_rejections_total: AtomicU64,
+    pub(crate) audit_events_total: AtomicU64,
+    pub(crate) persistence_checkpoint_degraded_total: AtomicU64,
+}
+
+#[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) started_at: Instant,
     pub(crate) config: Arc<AppConfig>,
+    pub(crate) auth_config: Arc<AuthConfig>,
     pub(crate) engine_loaded: Arc<AtomicBool>,
     pub(crate) storage_available: Arc<AtomicBool>,
-    pub(crate) persistence_writes: Arc<AtomicU64>,
-    pub(crate) collections: Arc<RwLock<BTreeMap<String, Collection>>>,
+    pub(crate) metrics: Arc<MetricsState>,
+    pub(crate) persistence_io_serial: Arc<Mutex<()>>,
+    pub(crate) collection_write_locks: Arc<Mutex<BTreeMap<String, Arc<Semaphore>>>>,
+    pub(crate) l2_index_building: Arc<RwLock<BTreeSet<String>>>,
+    pub(crate) tenant_rate_windows: Arc<Mutex<BTreeMap<String, TenantRateWindow>>>,
+    pub(crate) collections: Arc<RwLock<CollectionRegistry>>,
     pub(crate) l2_indexes: Arc<RwLock<BTreeMap<String, IvfIndex>>>,
 }
 
-impl Clone for AppState {
-    fn clone(&self) -> Self {
-        Self {
-            started_at: self.started_at,
-            config: Arc::clone(&self.config),
-            engine_loaded: Arc::clone(&self.engine_loaded),
-            storage_available: Arc::clone(&self.storage_available),
-            persistence_writes: Arc::clone(&self.persistence_writes),
-            collections: Arc::clone(&self.collections),
-            l2_indexes: Arc::clone(&self.l2_indexes),
-        }
-    }
-}
-
 impl AppState {
+    #[cfg(test)]
     pub(crate) fn with_collections(
         config: AppConfig,
         collections: BTreeMap<String, Collection>,
     ) -> Self {
+        Self::with_collections_and_auth(config, collections, AuthConfig::default())
+    }
+
+    pub(crate) fn with_collections_and_auth(
+        config: AppConfig,
+        collections: BTreeMap<String, Collection>,
+        auth_config: AuthConfig,
+    ) -> Self {
+        let collections: CollectionRegistry = collections
+            .into_iter()
+            .map(|(name, collection)| (name, Arc::new(RwLock::new(collection))))
+            .collect();
+        let collection_write_locks = collections
+            .keys()
+            .map(|name| (name.clone(), Arc::new(Semaphore::new(1))))
+            .collect();
+
         Self {
             started_at: Instant::now(),
             config: Arc::new(config),
+            auth_config: Arc::new(auth_config),
             engine_loaded: Arc::new(AtomicBool::new(true)),
             storage_available: Arc::new(AtomicBool::new(true)),
-            persistence_writes: Arc::new(AtomicU64::new(0)),
+            metrics: Arc::new(MetricsState::default()),
+            persistence_io_serial: Arc::new(Mutex::new(())),
+            collection_write_locks: Arc::new(Mutex::new(collection_write_locks)),
+            l2_index_building: Arc::new(RwLock::new(BTreeSet::new())),
+            tenant_rate_windows: Arc::new(Mutex::new(BTreeMap::new())),
             collections: Arc::new(RwLock::new(collections)),
             l2_indexes: Arc::new(RwLock::new(BTreeMap::new())),
         }

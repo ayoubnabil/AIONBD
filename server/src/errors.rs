@@ -51,6 +51,22 @@ impl ApiError {
         }
     }
 
+    pub(crate) fn unauthorized(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            code: "unauthorized",
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn resource_exhausted(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::TOO_MANY_REQUESTS,
+            code: "resource_exhausted",
+            message: message.into(),
+        }
+    }
+
     fn request_timeout() -> Self {
         Self {
             status: StatusCode::REQUEST_TIMEOUT,

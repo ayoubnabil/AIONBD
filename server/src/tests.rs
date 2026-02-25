@@ -6,12 +6,22 @@ use tower::ServiceExt;
 use crate::build_app;
 use crate::config::AppConfig;
 use crate::state::AppState;
+mod auth_isolation;
 mod checkpointing;
 mod collection_deletion;
+mod filtering;
+mod http_metrics;
+mod index_cache;
+mod limits;
 mod list_points;
+mod list_points_offset;
+mod metrics;
+mod metrics_prometheus;
 mod persistence;
+mod persistence_degraded;
 mod persistence_rollbacks;
 mod search;
+mod search_advanced;
 
 fn test_state() -> AppState {
     let config = AppConfig {
@@ -21,6 +31,8 @@ fn test_state() -> AppState {
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
         max_concurrency: 256,
+        max_page_limit: 1_000,
+        max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: false,
         snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
@@ -67,7 +79,10 @@ async fn collection_point_crud_flow_works() {
         .method("PUT")
         .uri("/collections/demo/points/42")
         .header("content-type", "application/json")
-        .body(Body::from(json!({"values": [1.0, 2.0, 3.0]}).to_string()))
+        .body(Body::from(
+            json!({"values": [1.0, 2.0, 3.0], "payload": {"tenant": "edge", "version": 2}})
+                .to_string(),
+        ))
         .expect("request must build");
 
     let upsert_resp = app
@@ -113,6 +128,8 @@ async fn collection_point_crud_flow_works() {
     let point_json = json_body(get_point_resp).await;
     assert_eq!(point_json["id"], 42);
     assert_eq!(point_json["values"], json!([1.0, 2.0, 3.0]));
+    assert_eq!(point_json["payload"]["tenant"], "edge");
+    assert_eq!(point_json["payload"]["version"], 2);
 
     let delete_req = Request::builder()
         .method("DELETE")
@@ -239,62 +256,4 @@ async fn list_collections_returns_sorted_names() {
     let list_json = json_body(list_resp).await;
     assert_eq!(list_json["collections"][0]["name"], "alpha");
     assert_eq!(list_json["collections"][1]["name"], "zeta");
-}
-
-#[tokio::test]
-async fn search_collection_returns_best_match() {
-    let app = build_app(test_state());
-
-    let create_req = Request::builder()
-        .method("POST")
-        .uri("/collections")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            json!({"name": "search_demo", "dimension": 3}).to_string(),
-        ))
-        .expect("request must build");
-    let create_resp = app
-        .clone()
-        .oneshot(create_req)
-        .await
-        .expect("response expected");
-    assert_eq!(create_resp.status(), StatusCode::OK);
-
-    for (id, values) in [
-        (1u64, json!([1.0, 0.0, 0.0])),
-        (2u64, json!([0.1, 0.0, 0.0])),
-    ] {
-        let upsert_req = Request::builder()
-            .method("PUT")
-            .uri(format!("/collections/search_demo/points/{id}"))
-            .header("content-type", "application/json")
-            .body(Body::from(json!({"values": values}).to_string()))
-            .expect("request must build");
-
-        let upsert_resp = app
-            .clone()
-            .oneshot(upsert_req)
-            .await
-            .expect("response expected");
-        assert_eq!(upsert_resp.status(), StatusCode::OK);
-    }
-
-    let search_req = Request::builder()
-        .method("POST")
-        .uri("/collections/search_demo/search")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            json!({"query": [1.0, 0.0, 0.0], "metric": "dot"}).to_string(),
-        ))
-        .expect("request must build");
-    let search_resp = app
-        .clone()
-        .oneshot(search_req)
-        .await
-        .expect("response expected");
-    assert_eq!(search_resp.status(), StatusCode::OK);
-
-    let search_json = json_body(search_resp).await;
-    assert_eq!(search_json["id"], 1);
-    assert_eq!(search_json["metric"], "dot");
 }

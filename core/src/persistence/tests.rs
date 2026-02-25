@@ -5,7 +5,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{Collection, CollectionConfig};
 
-use super::{apply_wal_record, load_collections, persist_change, WalRecord};
+use super::{
+    append_wal_record, apply_wal_record, checkpoint_wal, incremental_snapshot_dir,
+    load_collections, persist_change, WalRecord,
+};
 
 fn test_paths(prefix: &str) -> (PathBuf, PathBuf, PathBuf) {
     let timestamp = SystemTime::now()
@@ -45,6 +48,7 @@ fn wal_records_apply_in_order() {
             collection: "demo".to_string(),
             id: 1,
             values: vec![1.0, 2.0, 3.0],
+            payload: None,
         },
     )
     .expect("upsert must succeed");
@@ -151,6 +155,31 @@ fn load_collections_replays_wal_when_snapshot_missing() {
 }
 
 #[test]
+fn load_collections_tolerates_truncated_last_wal_record() {
+    let (root, snapshot_path, wal_path) = test_paths("wal_truncated_tail");
+    fs::create_dir_all(root.join("data")).expect("data directory should be creatable");
+
+    fs::write(
+        &wal_path,
+        [
+            r#"{"type":"create_collection","name":"demo","dimension":2,"strict_finite":true}"#,
+            r#"{"type":"upsert_point","collection":"demo","id":5,"values":[1.0,2.0]}"#,
+            r#"{"type":"upsert_point","collection":"demo","id":6,"values":[9.0"#,
+        ]
+        .join("\n"),
+    )
+    .expect("wal should be writable");
+
+    let collections = load_collections(&snapshot_path, &wal_path)
+        .expect("load should tolerate truncated tail record");
+    let collection = collections.get("demo").expect("collection should exist");
+    assert_eq!(collection.get_point(5), Some(&[1.0, 2.0][..]));
+    assert_eq!(collection.get_point(6), None);
+
+    cleanup(&root);
+}
+
+#[test]
 fn load_collections_tolerates_replayed_create_after_snapshot() {
     let (root, snapshot_path, wal_path) = test_paths("idempotent_create");
 
@@ -168,6 +197,95 @@ fn load_collections_tolerates_replayed_create_after_snapshot() {
 
     let collections = load_collections(&snapshot_path, &wal_path).expect("load should succeed");
     assert!(collections.contains_key("demo"));
+
+    cleanup(&root);
+}
+
+#[test]
+fn load_collections_tolerates_legacy_invalid_create_record() {
+    let (root, snapshot_path, wal_path) = test_paths("invalid_create_record");
+    fs::create_dir_all(root.join("data")).expect("data directory should be creatable");
+
+    fs::write(
+        &wal_path,
+        [
+            r#"{"type":"create_collection","name":"bad","dimension":0,"strict_finite":true}"#,
+            r#"{"type":"create_collection","name":"demo","dimension":2,"strict_finite":true}"#,
+            r#"{"type":"upsert_point","collection":"demo","id":7,"values":[1.0,2.0]}"#,
+        ]
+        .join("\n"),
+    )
+    .expect("wal should be writable");
+
+    let collections = load_collections(&snapshot_path, &wal_path).expect("load should succeed");
+    assert!(!collections.contains_key("bad"));
+    let demo = collections
+        .get("demo")
+        .expect("demo collection should exist");
+    assert_eq!(demo.get_point(7), Some(&[1.0, 2.0][..]));
+
+    cleanup(&root);
+}
+
+#[test]
+fn load_collections_replays_incremental_snapshot_segments() {
+    let (root, snapshot_path, wal_path) = test_paths("incrementals");
+    fs::create_dir_all(&root).expect("root directory should exist");
+
+    fs::write(
+        &snapshot_path,
+        r#"{"version":1,"collections":[{"name":"demo","dimension":2,"strict_finite":true,"points":[]}]} "#,
+    )
+    .expect("snapshot should be writable");
+
+    let incremental_dir = incremental_snapshot_dir(&snapshot_path);
+    fs::create_dir_all(&incremental_dir).expect("incremental directory should exist");
+    fs::write(
+        incremental_dir.join("0000000000000001.jsonl"),
+        r#"{"type":"upsert_point","collection":"demo","id":1,"values":[3.0,4.0]}"#,
+    )
+    .expect("incremental snapshot should be writable");
+
+    let collections = load_collections(&snapshot_path, &wal_path).expect("load should succeed");
+    let collection = collections.get("demo").expect("collection should exist");
+    assert_eq!(collection.get_point(1), Some(&[3.0, 4.0][..]));
+
+    cleanup(&root);
+}
+
+#[test]
+fn checkpoint_wal_rotates_segments_and_compacts_after_threshold() {
+    let (root, snapshot_path, wal_path) = test_paths("wal_compaction");
+
+    for id in 0..8_u64 {
+        append_wal_record(
+            &wal_path,
+            &WalRecord::CreateCollection {
+                name: format!("demo_{id}"),
+                dimension: 2,
+                strict_finite: true,
+            },
+        )
+        .expect("append wal should succeed");
+        let outcome = checkpoint_wal(&snapshot_path, &wal_path).expect("checkpoint should succeed");
+        assert!(matches!(outcome, super::PersistOutcome::Checkpointed));
+    }
+
+    let incremental_dir = incremental_snapshot_dir(&snapshot_path);
+    let remaining_segments = fs::read_dir(&incremental_dir)
+        .expect("incremental directory should be readable")
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension == "jsonl")
+        })
+        .count();
+    assert_eq!(remaining_segments, 0);
+
+    let restored = load_collections(&snapshot_path, &wal_path).expect("restore should succeed");
+    assert_eq!(restored.len(), 8);
 
     cleanup(&root);
 }

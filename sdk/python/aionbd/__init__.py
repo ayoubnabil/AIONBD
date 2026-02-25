@@ -1,12 +1,13 @@
 """Python SDK for AIONBD."""
 
-from .client import (
-    AionBDClient,
-    AionBDError,
+from .client import AionBDClient
+from .errors import AionBDError
+from .models import (
     CollectionInfo,
     DeleteCollectionResult,
     DeletePointResult,
     DistanceResult,
+    MetricsResult,
     PointResult,
     SearchResult,
     UpsertPointResult,
@@ -21,5 +22,6 @@ __all__ = [
     "DeleteCollectionResult",
     "UpsertPointResult",
     "PointResult",
+    "MetricsResult",
     "DeletePointResult",
 ]

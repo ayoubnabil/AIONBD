@@ -1,43 +1,110 @@
-use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
-use aionbd_core::{append_wal_record, checkpoint_snapshot, Collection, PersistOutcome, WalRecord};
+use aionbd_core::{
+    append_wal_record_with_sync, checkpoint_wal, PersistOutcome, PersistenceError, WalRecord,
+};
+use tokio::task;
 
 use crate::errors::ApiError;
+use crate::index_manager::remove_l2_index_entry;
 use crate::state::AppState;
 
-pub(crate) fn persist_change_if_enabled(
+pub(crate) async fn persist_change_if_enabled(
     state: &AppState,
-    collections: &BTreeMap<String, Collection>,
     record: &WalRecord,
 ) -> Result<(), ApiError> {
+    invalidate_cached_l2_index(state, record);
+
     if !state.config.persistence_enabled {
         return Ok(());
     }
 
-    if let Err(error) = append_wal_record(&state.config.wal_path, record) {
+    let wal_path = state.config.wal_path.clone();
+    let wal_record = record.clone();
+    let sync_on_write = true;
+    if let Err(error) = run_serialized_persistence_io(state, move || {
+        append_wal_record_with_sync(&wal_path, &wal_record, sync_on_write)
+    })
+    .await
+    {
+        state.storage_available.store(false, Ordering::Relaxed);
         tracing::error!(%error, "failed to append wal record");
         return Err(ApiError::internal("failed to persist state"));
     }
 
-    let writes_since_start = state.persistence_writes.fetch_add(1, Ordering::Relaxed) + 1;
-    if !writes_since_start.is_multiple_of(state.config.checkpoint_interval as u64) {
+    let writes_since_start = state
+        .metrics
+        .persistence_writes
+        .fetch_add(1, Ordering::Relaxed)
+        + 1;
+    if !is_checkpoint_due(writes_since_start, state.config.checkpoint_interval) {
         return Ok(());
     }
 
-    match checkpoint_snapshot(
-        &state.config.snapshot_path,
-        &state.config.wal_path,
-        collections,
-    ) {
-        Ok(PersistOutcome::Checkpointed) => Ok(()),
+    let snapshot_path = state.config.snapshot_path.clone();
+    let wal_path = state.config.wal_path.clone();
+    match run_serialized_persistence_io(state, move || checkpoint_wal(&snapshot_path, &wal_path))
+        .await
+    {
+        Ok(PersistOutcome::Checkpointed) => {
+            state.storage_available.store(true, Ordering::Relaxed);
+            Ok(())
+        }
         Ok(PersistOutcome::WalOnly { reason }) => {
+            state.storage_available.store(false, Ordering::Relaxed);
+            let _ = state
+                .metrics
+                .persistence_checkpoint_degraded_total
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!(%reason, "snapshot checkpoint skipped, relying on wal replay");
             Ok(())
         }
         Err(error) => {
+            state.storage_available.store(false, Ordering::Relaxed);
             tracing::error!(%error, "failed to persist state");
             Err(ApiError::internal("failed to persist state"))
         }
     }
+}
+
+async fn run_serialized_persistence_io<T>(
+    state: &AppState,
+    operation: impl FnOnce() -> Result<T, PersistenceError> + Send + 'static,
+) -> Result<T, PersistenceError>
+where
+    T: Send + 'static,
+{
+    let serial = Arc::clone(&state.persistence_io_serial);
+    run_persistence_io(move || {
+        let _guard = serial.lock().map_err(|_| {
+            PersistenceError::InvalidData("persistence io serial lock poisoned".to_string())
+        })?;
+        operation()
+    })
+    .await
+}
+
+fn invalidate_cached_l2_index(state: &AppState, record: &WalRecord) {
+    match record {
+        WalRecord::CreateCollection { name, .. } | WalRecord::DeleteCollection { name } => {
+            remove_l2_index_entry(state, name);
+        }
+        WalRecord::UpsertPoint { .. } | WalRecord::DeletePoint { .. } => {}
+    }
+}
+
+async fn run_persistence_io<T>(
+    operation: impl FnOnce() -> Result<T, PersistenceError> + Send + 'static,
+) -> Result<T, PersistenceError>
+where
+    T: Send + 'static,
+{
+    task::spawn_blocking(operation).await.map_err(|error| {
+        PersistenceError::InvalidData(format!("persistence background task failed: {error}"))
+    })?
+}
+
+fn is_checkpoint_due(writes_since_start: u64, checkpoint_interval: usize) -> bool {
+    writes_since_start.checked_rem(checkpoint_interval as u64) == Some(0)
 }

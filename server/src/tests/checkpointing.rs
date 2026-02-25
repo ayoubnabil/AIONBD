@@ -40,6 +40,8 @@ async fn checkpoint_interval_truncates_wal_periodically() {
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
         max_concurrency: 256,
+        max_page_limit: 1_000,
+        max_topk_limit: 1_000,
         checkpoint_interval: 3,
         persistence_enabled: true,
         snapshot_path,

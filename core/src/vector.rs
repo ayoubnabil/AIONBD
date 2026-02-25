@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use wide::f32x8;
 
 /// Identifies which input vector triggered a validation error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,7 +148,7 @@ pub fn dot_product_with_options(
     options: VectorValidationOptions,
 ) -> Result<f32, VectorError> {
     validate_vectors(left, right, options)?;
-    Ok(left.iter().zip(right).map(|(l, r)| l * r).sum())
+    Ok(simd_dot(left, right))
 }
 
 /// Computes the Euclidean (L2) distance using strict validation.
@@ -161,16 +162,18 @@ pub fn l2_distance_with_options(
     right: &[f32],
     options: VectorValidationOptions,
 ) -> Result<f32, VectorError> {
-    validate_vectors(left, right, options)?;
-    let squared_sum: f32 = left
-        .iter()
-        .zip(right)
-        .map(|(l, r)| {
-            let delta = l - r;
-            delta * delta
-        })
-        .sum();
+    let squared_sum = l2_squared_with_options(left, right, options)?;
     Ok(squared_sum.sqrt())
+}
+
+/// Computes the squared Euclidean (L2) distance with custom validation options.
+pub fn l2_squared_with_options(
+    left: &[f32],
+    right: &[f32],
+    options: VectorValidationOptions,
+) -> Result<f32, VectorError> {
+    validate_vectors(left, right, options)?;
+    Ok(simd_l2_squared(left, right))
 }
 
 /// Computes cosine similarity using strict validation.
@@ -178,9 +181,8 @@ pub fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, VectorError
     cosine_similarity_with_options(left, right, VectorValidationOptions::strict())
 }
 
-/// Computes cosine similarity with custom validation options.
-///
-/// The implementation uses a single pass to accumulate dot and squared norms.
+/// Computes cosine similarity with custom validation options. The implementation
+/// uses a single pass to accumulate dot and squared norms.
 pub fn cosine_similarity_with_options(
     left: &[f32],
     right: &[f32],
@@ -188,15 +190,7 @@ pub fn cosine_similarity_with_options(
 ) -> Result<f32, VectorError> {
     validate_vectors(left, right, options)?;
 
-    let mut dot = 0.0f32;
-    let mut left_sq_sum = 0.0f32;
-    let mut right_sq_sum = 0.0f32;
-
-    for (left_value, right_value) in left.iter().zip(right) {
-        dot += left_value * right_value;
-        left_sq_sum += left_value * left_value;
-        right_sq_sum += right_value * right_value;
-    }
+    let (dot, left_sq_sum, right_sq_sum) = simd_dot_and_norms(left, right);
 
     let epsilon = options.zero_norm_epsilon.max(0.0);
     if left_sq_sum <= epsilon || right_sq_sum <= epsilon {
@@ -204,6 +198,102 @@ pub fn cosine_similarity_with_options(
     }
 
     Ok(dot / (left_sq_sum.sqrt() * right_sq_sum.sqrt()))
+}
+
+const SIMD_WIDTH: usize = 8;
+
+fn load_f32x8(values: &[f32]) -> f32x8 {
+    debug_assert_eq!(values.len(), SIMD_WIDTH);
+    f32x8::from([
+        values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
+    ])
+}
+
+fn simd_scan(
+    left: &[f32],
+    right: &[f32],
+    mut simd_step: impl FnMut(f32x8, f32x8),
+    mut scalar_step: impl FnMut(f32, f32),
+) {
+    let mut left_chunks = left.chunks_exact(SIMD_WIDTH);
+    let mut right_chunks = right.chunks_exact(SIMD_WIDTH);
+
+    for (left_chunk, right_chunk) in left_chunks.by_ref().zip(right_chunks.by_ref()) {
+        simd_step(load_f32x8(left_chunk), load_f32x8(right_chunk));
+    }
+
+    for (&left_value, &right_value) in left_chunks.remainder().iter().zip(right_chunks.remainder())
+    {
+        scalar_step(left_value, right_value);
+    }
+}
+
+fn simd_dot(left: &[f32], right: &[f32]) -> f32 {
+    let mut simd_sum = f32x8::ZERO;
+    let mut scalar_sum = 0.0;
+
+    simd_scan(
+        left,
+        right,
+        |left_v, right_v| {
+            simd_sum += left_v * right_v;
+        },
+        |left_value, right_value| {
+            scalar_sum += left_value * right_value;
+        },
+    );
+
+    simd_sum.reduce_add() + scalar_sum
+}
+
+fn simd_l2_squared(left: &[f32], right: &[f32]) -> f32 {
+    let mut simd_sum = f32x8::ZERO;
+    let mut scalar_sum = 0.0;
+
+    simd_scan(
+        left,
+        right,
+        |left_v, right_v| {
+            let delta = left_v - right_v;
+            simd_sum += delta * delta;
+        },
+        |left_value, right_value| {
+            let delta = left_value - right_value;
+            scalar_sum += delta * delta;
+        },
+    );
+
+    simd_sum.reduce_add() + scalar_sum
+}
+
+fn simd_dot_and_norms(left: &[f32], right: &[f32]) -> (f32, f32, f32) {
+    let mut dot_sum = f32x8::ZERO;
+    let mut left_sq_sum = f32x8::ZERO;
+    let mut right_sq_sum = f32x8::ZERO;
+    let mut dot_scalar = 0.0;
+    let mut left_sq_scalar = 0.0;
+    let mut right_sq_scalar = 0.0;
+
+    simd_scan(
+        left,
+        right,
+        |left_v, right_v| {
+            dot_sum += left_v * right_v;
+            left_sq_sum += left_v * left_v;
+            right_sq_sum += right_v * right_v;
+        },
+        |left_value, right_value| {
+            dot_scalar += left_value * right_value;
+            left_sq_scalar += left_value * left_value;
+            right_sq_scalar += right_value * right_value;
+        },
+    );
+
+    (
+        dot_sum.reduce_add() + dot_scalar,
+        left_sq_sum.reduce_add() + left_sq_scalar,
+        right_sq_sum.reduce_add() + right_sq_scalar,
+    )
 }
 
 #[cfg(test)]

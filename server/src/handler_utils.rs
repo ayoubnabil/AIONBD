@@ -1,8 +1,13 @@
-use aionbd_core::Collection;
+use std::sync::Arc;
 
+use aionbd_core::Collection;
+use tokio::sync::Semaphore;
+
+use crate::auth::{AuthMode, TenantContext};
 use crate::config::AppConfig;
 use crate::errors::ApiError;
-use crate::models::{CollectionResponse, DistanceRequest};
+use crate::models::{CollectionResponse, DistanceRequest, PointPayload};
+use crate::state::{AppState, CollectionHandle};
 
 pub(crate) fn validate_distance_request(
     payload: &DistanceRequest,
@@ -41,14 +46,155 @@ pub(crate) fn validate_distance_request(
 }
 
 pub(crate) fn canonical_collection_name(name: &str) -> Result<String, ApiError> {
+    const MAX_COLLECTION_NAME_LEN: usize = 128;
+
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err(ApiError::invalid_argument(
             "collection name must not be empty",
         ));
     }
+    if trimmed.len() > MAX_COLLECTION_NAME_LEN {
+        return Err(ApiError::invalid_argument(format!(
+            "collection name must be <= {MAX_COLLECTION_NAME_LEN} characters"
+        )));
+    }
+    if trimmed == "." || trimmed == ".." || trimmed.contains("..") {
+        return Err(ApiError::invalid_argument(
+            "collection name contains an invalid path segment",
+        ));
+    }
+    if !trimmed
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err(ApiError::invalid_argument(
+            "collection name may only contain ASCII letters, numbers, '-', '_' and '.'",
+        ));
+    }
 
     Ok(trimmed.to_string())
+}
+
+pub(crate) fn validate_upsert_input(
+    values: &[f32],
+    payload: &PointPayload,
+    expected_dimension: usize,
+    strict_finite: bool,
+) -> Result<(), ApiError> {
+    if values.len() != expected_dimension {
+        return Err(ApiError::invalid_argument(format!(
+            "invalid vector dimension: expected {expected_dimension}, got {}",
+            values.len()
+        )));
+    }
+
+    if strict_finite {
+        if let Some(index) = values.iter().position(|value| !value.is_finite()) {
+            return Err(ApiError::invalid_argument(format!(
+                "vector contains non-finite value at index {index}"
+            )));
+        }
+    }
+
+    if payload.keys().any(|key| key.trim().is_empty()) {
+        return Err(ApiError::invalid_argument("payload keys must not be empty"));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn collection_handle(
+    state: &AppState,
+    raw_name: &str,
+    tenant: &TenantContext,
+) -> Result<(String, CollectionHandle), ApiError> {
+    let scoped_name = scoped_collection_name(state, raw_name, tenant)?;
+    let handle = collection_handle_by_name(state, &scoped_name)?;
+    Ok((scoped_name, handle))
+}
+
+pub(crate) fn collection_handle_by_name(
+    state: &AppState,
+    canonical_name: &str,
+) -> Result<CollectionHandle, ApiError> {
+    let collections = state
+        .collections
+        .read()
+        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+    collections
+        .get(canonical_name)
+        .cloned()
+        .ok_or_else(|| ApiError::not_found(format!("collection '{canonical_name}' not found")))
+}
+
+pub(crate) fn collection_write_lock(
+    state: &AppState,
+    canonical_name: &str,
+) -> Result<Arc<Semaphore>, ApiError> {
+    // Lock-order invariant:
+    // 1) `collection_write_locks` map mutex (short critical section)
+    // 2) per-collection semaphore permit from this map (held across mutation + persistence)
+    // 3) registry/collection RwLocks
+    // Never acquire these in reverse order.
+    let mut locks = state
+        .collection_write_locks
+        .lock()
+        .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+    Ok(Arc::clone(
+        locks
+            .entry(canonical_name.to_string())
+            .or_insert_with(|| Arc::new(Semaphore::new(1))),
+    ))
+}
+
+pub(crate) fn existing_collection_write_lock(
+    state: &AppState,
+    canonical_name: &str,
+) -> Result<Arc<Semaphore>, ApiError> {
+    {
+        let locks = state
+            .collection_write_locks
+            .lock()
+            .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+        if let Some(lock) = locks.get(canonical_name) {
+            return Ok(Arc::clone(lock));
+        }
+    }
+
+    {
+        let collections = state
+            .collections
+            .read()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        if !collections.contains_key(canonical_name) {
+            return Err(ApiError::not_found(format!(
+                "collection '{canonical_name}' not found"
+            )));
+        }
+    }
+
+    let mut locks = state
+        .collection_write_locks
+        .lock()
+        .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+    Ok(Arc::clone(
+        locks
+            .entry(canonical_name.to_string())
+            .or_insert_with(|| Arc::new(Semaphore::new(1))),
+    ))
+}
+
+pub(crate) fn remove_collection_write_lock(
+    state: &AppState,
+    canonical_name: &str,
+) -> Result<(), ApiError> {
+    let mut locks = state
+        .collection_write_locks
+        .lock()
+        .map_err(|_| ApiError::internal("collection write lock map poisoned"))?;
+    let _ = locks.remove(canonical_name);
+    Ok(())
 }
 
 pub(crate) fn build_collection_response(collection: &Collection) -> CollectionResponse {
@@ -60,6 +206,63 @@ pub(crate) fn build_collection_response(collection: &Collection) -> CollectionRe
     }
 }
 
+pub(crate) fn scoped_collection_name(
+    state: &AppState,
+    raw_name: &str,
+    tenant: &TenantContext,
+) -> Result<String, ApiError> {
+    let canonical = canonical_collection_name(raw_name)?;
+    let Some(prefix) = tenant_scope_prefix(state, tenant)? else {
+        return Ok(canonical);
+    };
+    Ok(format!("{prefix}{canonical}"))
+}
+
+pub(crate) fn visible_collection_name(
+    state: &AppState,
+    stored_name: &str,
+    tenant: &TenantContext,
+) -> Result<Option<String>, ApiError> {
+    let Some(prefix) = tenant_scope_prefix(state, tenant)? else {
+        return Ok(Some(stored_name.to_string()));
+    };
+    if !stored_name.starts_with(&prefix) {
+        return Ok(None);
+    }
+    Ok(Some(stored_name[prefix.len()..].to_string()))
+}
+
+fn tenant_scope_prefix(
+    state: &AppState,
+    tenant: &TenantContext,
+) -> Result<Option<String>, ApiError> {
+    if state.auth_config.mode == AuthMode::Disabled {
+        return Ok(None);
+    }
+    let Some(tenant_id) = tenant.tenant_id() else {
+        return Err(ApiError::unauthorized("tenant context is missing"));
+    };
+    Ok(Some(format!("{tenant_id}::")))
+}
+
 fn first_non_finite_index(values: &[f32]) -> Option<usize> {
     values.iter().position(|value| !value.is_finite())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::canonical_collection_name;
+
+    #[test]
+    fn canonical_collection_name_rejects_path_like_segments() {
+        assert!(canonical_collection_name("../demo").is_err());
+        assert!(canonical_collection_name("demo/../x").is_err());
+        assert!(canonical_collection_name("demo\\x").is_err());
+    }
+
+    #[test]
+    fn canonical_collection_name_accepts_safe_charset() {
+        let name = canonical_collection_name("tenant-a.demo_1").expect("name should be accepted");
+        assert_eq!(name, "tenant-a.demo_1");
+    }
 }

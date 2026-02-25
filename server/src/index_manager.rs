@@ -1,0 +1,171 @@
+use std::sync::atomic::Ordering;
+
+use aionbd_core::Collection;
+
+use crate::ivf_index::IvfIndex;
+use crate::state::AppState;
+
+pub(crate) fn record_l2_lookup_hit(state: &AppState) {
+    let _ = state
+        .metrics
+        .l2_index_cache_lookups
+        .fetch_add(1, Ordering::Relaxed);
+    let _ = state
+        .metrics
+        .l2_index_cache_hits
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub(crate) fn record_l2_lookup_miss(state: &AppState) {
+    let _ = state
+        .metrics
+        .l2_index_cache_lookups
+        .fetch_add(1, Ordering::Relaxed);
+    let _ = state
+        .metrics
+        .l2_index_cache_misses
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub(crate) fn l2_cache_hit_ratio(state: &AppState) -> f64 {
+    let lookups = state.metrics.l2_index_cache_lookups.load(Ordering::Relaxed);
+    if lookups == 0 {
+        return 0.0;
+    }
+    let hits = state.metrics.l2_index_cache_hits.load(Ordering::Relaxed);
+    hits as f64 / lookups as f64
+}
+
+pub(crate) fn l2_build_in_flight(state: &AppState) -> usize {
+    state
+        .l2_index_building
+        .read()
+        .map(|building| building.len())
+        .unwrap_or(0)
+}
+
+pub(crate) fn remove_l2_index_entry(state: &AppState, collection_name: &str) {
+    if let Ok(mut cache) = state.l2_indexes.write() {
+        let _ = cache.remove(collection_name);
+    }
+}
+
+pub(crate) fn schedule_l2_build_if_needed(
+    state: &AppState,
+    collection_name: &str,
+    collection: &Collection,
+) {
+    if collection.len() < IvfIndex::min_indexed_points() {
+        return;
+    }
+
+    let collection_name = collection_name.to_string();
+    {
+        let Ok(mut building) = state.l2_index_building.write() else {
+            return;
+        };
+        if building.contains(&collection_name) {
+            return;
+        }
+        building.insert(collection_name.clone());
+    }
+
+    let _ = state
+        .metrics
+        .l2_index_build_requests
+        .fetch_add(1, Ordering::Relaxed);
+    let state = state.clone();
+    tokio::spawn(async move {
+        let collection_name_for_build = collection_name.clone();
+        let state_for_build = state.clone();
+
+        let build_result = tokio::task::spawn_blocking(move || {
+            let handle = state_for_build
+                .collections
+                .read()
+                .ok()
+                .and_then(|collections| collections.get(&collection_name_for_build).cloned());
+            let Some(handle) = handle else {
+                return Ok::<Option<IvfIndex>, String>(None);
+            };
+
+            let (dimension, len, mutation_version, snapshot_points) = {
+                let collection = handle
+                    .read()
+                    .map_err(|_| "collection lock poisoned during index build".to_string())?;
+                if collection.len() < IvfIndex::min_indexed_points() {
+                    return Ok(None);
+                }
+                let snapshot_points: Vec<(u64, Vec<f32>)> = collection
+                    .iter_points()
+                    .map(|(id, values)| (id, values.to_vec()))
+                    .collect();
+                (
+                    collection.dimension(),
+                    collection.len(),
+                    collection.mutation_version(),
+                    snapshot_points,
+                )
+            };
+
+            Ok(IvfIndex::build_from_snapshot(
+                dimension,
+                len,
+                mutation_version,
+                &snapshot_points,
+            ))
+        })
+        .await;
+
+        if let Ok(mut building) = state.l2_index_building.write() {
+            let _ = building.remove(&collection_name);
+        }
+
+        match build_result {
+            Ok(Ok(Some(index))) => {
+                if let Ok(mut cache) = state.l2_indexes.write() {
+                    cache.insert(collection_name.clone(), index);
+                }
+                let _ = state
+                    .metrics
+                    .l2_index_build_successes
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(Ok(None)) => {}
+            Ok(Err(error)) => {
+                let _ = state
+                    .metrics
+                    .l2_index_build_failures
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(collection = %collection_name, %error, "l2 index build failed");
+            }
+            Err(error) => {
+                let _ = state
+                    .metrics
+                    .l2_index_build_failures
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(collection = %collection_name, %error, "l2 index build task failed");
+            }
+        }
+    });
+}
+
+pub(crate) fn warmup_l2_indexes(state: &AppState) {
+    let handles: Vec<(String, crate::state::CollectionHandle)> = state
+        .collections
+        .read()
+        .map(|collections| {
+            collections
+                .iter()
+                .map(|(name, handle)| (name.clone(), handle.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    for (name, handle) in handles {
+        let Ok(collection) = handle.read() else {
+            continue;
+        };
+        schedule_l2_build_if_needed(state, &name, &collection);
+    }
+}

@@ -1,183 +1,169 @@
-use std::sync::atomic::Ordering;
-
-use aionbd_core::{
-    cosine_similarity_with_options, dot_product_with_options, l2_distance_with_options, Collection,
-    CollectionConfig, VectorValidationOptions, WalRecord,
-};
+use aionbd_core::{Collection, CollectionConfig, WalRecord};
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
 use axum::Json;
 
-use crate::errors::{map_collection_error, map_json_rejection, map_vector_error, ApiError};
+use crate::auth::TenantContext;
+use crate::errors::{map_collection_error, map_json_rejection, ApiError};
 use crate::handler_utils::{
-    build_collection_response, canonical_collection_name, validate_distance_request,
+    build_collection_response, canonical_collection_name, collection_handle,
+    collection_handle_by_name, collection_write_lock, existing_collection_write_lock,
+    remove_collection_write_lock, scoped_collection_name, validate_upsert_input,
+    visible_collection_name,
 };
+pub(crate) use crate::handlers_health::{distance, live, ready};
+use crate::index_manager::remove_l2_index_entry;
 use crate::models::{
     CollectionResponse, CreateCollectionRequest, DeleteCollectionResponse, DeletePointResponse,
-    DistanceRequest, DistanceResponse, ListCollectionsResponse, LiveResponse, Metric,
-    PointResponse, ReadyChecks, ReadyResponse, UpsertPointRequest, UpsertPointResponse,
+    ListCollectionsResponse, PointResponse, UpsertPointRequest, UpsertPointResponse,
 };
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
 
-pub(crate) async fn live(State(state): State<AppState>) -> Json<LiveResponse> {
-    Json(LiveResponse {
-        status: "live",
-        uptime_ms: state.started_at.elapsed().as_millis() as u64,
-    })
-}
-
-pub(crate) async fn ready(State(state): State<AppState>) -> Result<Json<ReadyResponse>, ApiError> {
-    let engine_loaded = state.engine_loaded.load(Ordering::Relaxed);
-    let storage_available = state.storage_available.load(Ordering::Relaxed);
-
-    let response = ReadyResponse {
-        status: if engine_loaded && storage_available {
-            "ready"
-        } else {
-            "not_ready"
-        },
-        uptime_ms: state.started_at.elapsed().as_millis() as u64,
-        checks: ReadyChecks {
-            engine_loaded,
-            storage_available,
-        },
-    };
-
-    if engine_loaded && storage_available {
-        Ok(Json(response))
-    } else {
-        Err(ApiError::service_unavailable(
-            "engine or storage is not ready",
-        ))
-    }
-}
-
-pub(crate) async fn distance(
-    State(state): State<AppState>,
-    payload: Result<Json<DistanceRequest>, JsonRejection>,
-) -> Result<Json<DistanceResponse>, ApiError> {
-    let Json(payload) = payload.map_err(map_json_rejection)?;
-    validate_distance_request(&payload, &state.config)?;
-
-    let options = VectorValidationOptions {
-        strict_finite: state.config.strict_finite,
-        zero_norm_epsilon: f32::EPSILON,
-    };
-
-    let value = match payload.metric {
-        Metric::Dot => dot_product_with_options(&payload.left, &payload.right, options),
-        Metric::L2 => l2_distance_with_options(&payload.left, &payload.right, options),
-        Metric::Cosine => cosine_similarity_with_options(&payload.left, &payload.right, options),
-    }
-    .map_err(map_vector_error)?;
-
-    Ok(Json(DistanceResponse {
-        metric: payload.metric,
-        value,
-    }))
-}
+const HARD_MAX_POINTS_PER_COLLECTION: usize = 1_000_000;
 
 pub(crate) async fn create_collection(
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
     payload: Result<Json<CreateCollectionRequest>, JsonRejection>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
     let Json(payload) = payload.map_err(map_json_rejection)?;
-    let name = canonical_collection_name(&payload.name)?;
-
+    let response_name = canonical_collection_name(&payload.name)?;
+    let name = scoped_collection_name(&state, &payload.name, &tenant)?;
+    if payload.dimension > state.config.max_dimension {
+        return Err(ApiError::invalid_argument(format!(
+            "dimension {} exceeds configured maximum {}",
+            payload.dimension, state.config.max_dimension
+        )));
+    }
     let config = CollectionConfig::new(payload.dimension, payload.strict_finite)
         .map_err(map_collection_error)?;
     let collection = Collection::new(name.clone(), config).map_err(map_collection_error)?;
+    let handle = std::sync::Arc::new(std::sync::RwLock::new(collection));
 
-    let mut collections = state
-        .collections
-        .write()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+    let _collection_guard = collection_write_lock(&state, &name)?
+        .acquire_owned()
+        .await
+        .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
 
-    if collections.contains_key(&name) {
-        return Err(ApiError::conflict(format!(
-            "collection '{name}' already exists"
-        )));
+    {
+        let collections = state
+            .collections
+            .read()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+
+        if collections.contains_key(&name) {
+            return Err(ApiError::conflict(format!(
+                "collection '{name}' already exists"
+            )));
+        }
     }
-
-    let response = build_collection_response(&collection);
-    collections.insert(name.clone(), collection);
 
     if let Err(error) = persist_change_if_enabled(
         &state,
-        &collections,
         &WalRecord::CreateCollection {
-            name,
+            name: name.clone(),
             dimension: payload.dimension,
             strict_finite: payload.strict_finite,
         },
-    ) {
-        let _ = collections.remove(&response.name);
+    )
+    .await
+    {
+        let _ = remove_collection_write_lock(&state, &name);
         return Err(error);
     }
 
-    Ok(Json(response))
+    {
+        let mut collections = state
+            .collections
+            .write()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        collections.insert(name, handle);
+    }
+
+    Ok(Json(CollectionResponse {
+        name: response_name,
+        dimension: payload.dimension,
+        strict_finite: payload.strict_finite,
+        point_count: 0,
+    }))
 }
 
 pub(crate) async fn list_collections(
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<ListCollectionsResponse>, ApiError> {
     let collections = state
         .collections
         .read()
         .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
 
-    let items = collections
-        .values()
-        .map(build_collection_response)
-        .collect();
+    let mut items = Vec::with_capacity(collections.len());
+    for collection in collections.values() {
+        let collection = collection
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        let Some(name) = visible_collection_name(&state, collection.name(), &tenant)? else {
+            continue;
+        };
+        let mut response = build_collection_response(&collection);
+        response.name = name;
+        items.push(response);
+    }
     Ok(Json(ListCollectionsResponse { collections: items }))
 }
 
 pub(crate) async fn get_collection(
     Path(name): Path<String>,
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
-    let name = canonical_collection_name(&name)?;
-
-    let collections = state
-        .collections
+    let response_name = canonical_collection_name(&name)?;
+    let (_, handle) = collection_handle(&state, &name, &tenant)?;
+    let collection = handle
         .read()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-
-    let collection = collections
-        .get(&name)
-        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-
-    Ok(Json(build_collection_response(collection)))
+        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+    let mut response = build_collection_response(&collection);
+    response.name = response_name;
+    Ok(Json(response))
 }
 
 pub(crate) async fn delete_collection(
     Path(name): Path<String>,
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<DeleteCollectionResponse>, ApiError> {
-    let name = canonical_collection_name(&name)?;
+    let response_name = canonical_collection_name(&name)?;
+    let name = scoped_collection_name(&state, &name, &tenant)?;
+    let _collection_guard = existing_collection_write_lock(&state, &name)?
+        .acquire_owned()
+        .await
+        .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
 
-    let mut collections = state
-        .collections
-        .write()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-
-    let removed_collection = collections
-        .remove(&name)
-        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-
-    if let Err(error) = persist_change_if_enabled(
-        &state,
-        &collections,
-        &WalRecord::DeleteCollection { name: name.clone() },
-    ) {
-        collections.insert(name.clone(), removed_collection);
-        return Err(error);
+    {
+        let collections = state
+            .collections
+            .read()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        if !collections.contains_key(&name) {
+            return Err(ApiError::not_found(format!(
+                "collection '{name}' not found"
+            )));
+        }
     }
 
+    persist_change_if_enabled(&state, &WalRecord::DeleteCollection { name: name.clone() }).await?;
+    {
+        let mut collections = state
+            .collections
+            .write()
+            .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+        let _ = collections.remove(&name);
+    }
+    let _ = remove_collection_write_lock(&state, &name);
+
     Ok(Json(DeleteCollectionResponse {
-        name,
+        name: response_name,
         deleted: true,
     }))
 }
@@ -185,50 +171,56 @@ pub(crate) async fn delete_collection(
 pub(crate) async fn upsert_point(
     Path((name, id)): Path<(String, u64)>,
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
     payload: Result<Json<UpsertPointRequest>, JsonRejection>,
 ) -> Result<Json<UpsertPointResponse>, ApiError> {
-    let name = canonical_collection_name(&name)?;
+    let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
-
-    let mut collections = state
-        .collections
-        .write()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+    let _collection_guard = existing_collection_write_lock(&state, &name)?
+        .acquire_owned()
+        .await
+        .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
+    let handle = collection_handle_by_name(&state, &name)?;
 
     let values = payload.values;
+    let payload_values = payload.payload;
     let wal_values = values.clone();
-    let (created, previous_values) = {
-        let collection = collections
-            .get_mut(&name)
-            .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-        let previous_values = collection.get_point(id).map(|point| point.to_vec());
-        let created = collection
-            .upsert_point(id, values)
-            .map_err(map_collection_error)?;
-        (created, previous_values)
-    };
+    let wal_payload = payload_values.clone();
+    {
+        let collection = handle
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        validate_upsert_input(
+            &values,
+            &payload_values,
+            collection.dimension(),
+            collection.strict_finite(),
+        )?;
+        if collection.get_point(id).is_none() && collection.len() >= HARD_MAX_POINTS_PER_COLLECTION
+        {
+            return Err(ApiError::resource_exhausted(format!(
+                "collection point limit exceeded ({HARD_MAX_POINTS_PER_COLLECTION})"
+            )));
+        }
+    }
 
-    if let Err(error) = persist_change_if_enabled(
+    persist_change_if_enabled(
         &state,
-        &collections,
         &WalRecord::UpsertPoint {
             collection: name.clone(),
             id,
             values: wal_values,
+            payload: Some(wal_payload),
         },
-    ) {
-        let collection = collections
-            .get_mut(&name)
-            .ok_or_else(|| ApiError::internal("collection missing during upsert rollback"))?;
-        if let Some(previous_values) = previous_values {
-            collection
-                .upsert_point(id, previous_values)
-                .map_err(|_| ApiError::internal("failed to rollback upsert mutation"))?;
-        } else {
-            let _ = collection.remove_point(id);
-        }
-        return Err(error);
-    }
+    )
+    .await?;
+
+    let created = handle
+        .write()
+        .map_err(|_| ApiError::internal("collection lock poisoned"))?
+        .upsert_point_with_payload(id, values, payload_values)
+        .map_err(map_collection_error)?;
+    remove_l2_index_entry(&state, &name);
 
     Ok(Json(UpsertPointResponse { id, created }))
 }
@@ -236,64 +228,62 @@ pub(crate) async fn upsert_point(
 pub(crate) async fn get_point(
     Path((name, id)): Path<(String, u64)>,
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<PointResponse>, ApiError> {
-    let name = canonical_collection_name(&name)?;
-
-    let collections = state
-        .collections
+    let (_, handle) = collection_handle(&state, &name, &tenant)?;
+    let collection = handle
         .read()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-
-    let collection = collections
-        .get(&name)
-        .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-
-    let values = collection
-        .get_point(id)
+        .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+    let (values, payload) = collection
+        .get_point_record(id)
         .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?;
 
     Ok(Json(PointResponse {
         id,
         values: values.to_vec(),
+        payload: payload.clone(),
     }))
 }
 
 pub(crate) async fn delete_point(
     Path((name, id)): Path<(String, u64)>,
     State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<DeletePointResponse>, ApiError> {
-    let name = canonical_collection_name(&name)?;
+    let name = scoped_collection_name(&state, &name, &tenant)?;
+    let _collection_guard = existing_collection_write_lock(&state, &name)?
+        .acquire_owned()
+        .await
+        .map_err(|_| ApiError::internal("collection write semaphore closed"))?;
+    let handle = collection_handle_by_name(&state, &name)?;
 
-    let mut collections = state
-        .collections
-        .write()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
+    {
+        let collection = handle
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        if collection.get_point(id).is_none() {
+            return Err(ApiError::not_found(format!("point '{id}' not found")));
+        }
+    }
 
-    let removed_values = {
-        let collection = collections
-            .get_mut(&name)
-            .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
-        collection
-            .remove_point(id)
-            .ok_or_else(|| ApiError::not_found(format!("point '{id}' not found")))?
-    };
-
-    if let Err(error) = persist_change_if_enabled(
+    persist_change_if_enabled(
         &state,
-        &collections,
         &WalRecord::DeletePoint {
             collection: name.clone(),
             id,
         },
-    ) {
-        let collection = collections
-            .get_mut(&name)
-            .ok_or_else(|| ApiError::internal("collection missing during delete rollback"))?;
-        collection
-            .upsert_point(id, removed_values)
-            .map_err(|_| ApiError::internal("failed to rollback delete point mutation"))?;
-        return Err(error);
+    )
+    .await?;
+
+    let deleted = handle
+        .write()
+        .map_err(|_| ApiError::internal("collection lock poisoned"))?
+        .remove_point(id)
+        .is_some();
+    if !deleted {
+        return Err(ApiError::not_found(format!("point '{id}' not found")));
     }
+    remove_l2_index_entry(&state, &name);
 
     Ok(Json(DeletePointResponse { id, deleted: true }))
 }

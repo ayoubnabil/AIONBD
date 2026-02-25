@@ -4,6 +4,8 @@
 //! Exposes:
 //! - `GET /live`: process liveness
 //! - `GET /ready`: readiness (engine/storage checks)
+//! - `GET /metrics`: runtime counters and state
+//! - `GET /metrics/prometheus`: runtime counters in Prometheus text format
 //! - `POST /distance`: validated vector operation endpoint
 //! - `POST /collections`: create an in-memory collection
 //! - `GET/DELETE /collections/:name`: collection metadata and deletion
@@ -19,6 +21,7 @@ use anyhow::{Context, Result};
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderName, Request};
+use axum::middleware;
 use axum::routing::{get, post, put};
 use axum::Router;
 use tower::limit::ConcurrencyLimitLayer;
@@ -30,12 +33,17 @@ use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use tower_http::LatencyUnit;
 use tracing_subscriber::EnvFilter;
 
+mod auth;
 mod config;
 mod errors;
 mod handler_utils;
 mod handlers;
+mod handlers_health;
+mod handlers_metrics;
 mod handlers_points;
 mod handlers_search;
+mod http_metrics;
+mod index_manager;
 mod ivf_index;
 mod models;
 mod persistence;
@@ -43,14 +51,18 @@ mod state;
 #[cfg(test)]
 mod tests;
 
+use crate::auth::{auth_rate_limit_audit, AuthConfig};
 use crate::config::AppConfig;
 use crate::errors::handle_middleware_error;
 use crate::handlers::{
     create_collection, delete_collection, delete_point, distance, get_collection, get_point,
     list_collections, live, ready, upsert_point,
 };
+use crate::handlers_metrics::{metrics, metrics_prometheus};
 use crate::handlers_points::list_points;
 use crate::handlers_search::{search_collection, search_collection_top_k};
+use crate::http_metrics::track_http_metrics;
+use crate::index_manager::warmup_l2_indexes;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -58,9 +70,12 @@ async fn main() -> Result<()> {
     init_tracing();
 
     let config = AppConfig::from_env().context("invalid configuration")?;
+    let auth_config = AuthConfig::from_env().context("invalid authentication configuration")?;
     let initial_collections = load_initial_collections(&config)?;
     let bind = config.bind;
-    let state = AppState::with_collections(config.clone(), initial_collections);
+    let state =
+        AppState::with_collections_and_auth(config.clone(), initial_collections, auth_config);
+    warmup_l2_indexes(&state);
     let app = build_app(state);
 
     let listener = tokio::net::TcpListener::bind(bind)
@@ -74,6 +89,8 @@ async fn main() -> Result<()> {
         timeout_ms = config.request_timeout_ms,
         max_body_bytes = config.max_body_bytes,
         max_concurrency = config.max_concurrency,
+        max_page_limit = config.max_page_limit,
+        max_topk_limit = config.max_topk_limit,
         checkpoint_interval = config.checkpoint_interval,
         persistence_enabled = config.persistence_enabled,
         snapshot_path = %config.snapshot_path.display(),
@@ -91,6 +108,8 @@ async fn main() -> Result<()> {
 
 pub(crate) fn build_app(state: AppState) -> Router {
     let request_id_header = HeaderName::from_static("x-request-id");
+    let http_metrics_layer = middleware::from_fn_with_state(state.clone(), track_http_metrics);
+    let auth_layer = middleware::from_fn_with_state(state.clone(), auth_rate_limit_audit);
     let config = state.config.clone();
     let timeout = Duration::from_millis(config.request_timeout_ms);
 
@@ -125,6 +144,8 @@ pub(crate) fn build_app(state: AppState) -> Router {
     Router::new()
         .route("/live", get(live))
         .route("/ready", get(ready))
+        .route("/metrics", get(metrics))
+        .route("/metrics/prometheus", get(metrics_prometheus))
         .route("/distance", post(distance))
         .route(
             "/collections",
@@ -145,7 +166,9 @@ pub(crate) fn build_app(state: AppState) -> Router {
             put(upsert_point).get(get_point).delete(delete_point),
         )
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
+        .layer(auth_layer)
         .layer(middleware)
+        .layer(http_metrics_layer)
         .with_state(state)
 }
 

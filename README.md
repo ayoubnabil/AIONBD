@@ -39,10 +39,19 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - This step focuses on project structure and baseline quality.
 - Contribution flow is branch-first local with mandatory expert review before merge (`CONTRIBUTING.md`).
 - Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`).
-- Search uses an IVF candidate index for large L2 collections; dot/cosine currently remain exact linear scan.
+- Search supports explicit modes (`exact`, `ivf`, `auto`) with target recall guarantees
+  and metadata filtering (`must`/`should` + range clauses).
+- Point payload metadata is supported on upsert/get/search responses.
+- Persistence rotates WAL into incremental snapshots and compacts periodically to control restart cost.
+- Cached L2 IVF indexes are invalidated automatically on collection and point mutations.
+- `/metrics` exposes runtime counts including aggregate readiness, HTTP request counters
+  (total/in-flight/2xx/4xx/5xx), and request latency aggregates
+  (`http_request_duration_us_total/max/avg`).
 - Server endpoints:
   - `GET /live`
   - `GET /ready`
+  - `GET /metrics`
+  - `GET /metrics/prometheus`
   - `POST /distance`
   - `POST /collections`
   - `GET /collections`

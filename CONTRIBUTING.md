@@ -26,8 +26,6 @@
 Run before asking for expert review:
 
 ```bash
-cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
 ./scripts/check_file_sizes.sh
+./scripts/verify_local.sh
 ```

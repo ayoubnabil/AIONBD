@@ -1,17 +1,16 @@
+use crate::{Collection, CollectionConfig, CollectionError, MetadataPayload, PointId};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-
-use serde::{Deserialize, Serialize};
-
-use crate::{Collection, CollectionConfig, CollectionError, PointId};
-
+mod fsync;
+mod incremental;
 mod snapshot;
-
+mod wal;
+pub use incremental::{incremental_snapshot_dir, CheckpointPolicy};
 use snapshot::{load_snapshot, write_snapshot};
+use wal::{append_wal, replay_wal, truncate_wal};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -28,6 +27,8 @@ pub enum WalRecord {
         collection: String,
         id: PointId,
         values: Vec<f32>,
+        #[serde(default)]
+        payload: Option<MetadataPayload>,
     },
     DeletePoint {
         collection: String,
@@ -85,6 +86,7 @@ pub fn load_collections(
     wal_path: &Path,
 ) -> Result<BTreeMap<String, Collection>, PersistenceError> {
     let mut collections = load_snapshot(snapshot_path)?;
+    incremental::replay_incremental_snapshots(snapshot_path, &mut collections)?;
     replay_wal(wal_path, &mut collections)?;
     Ok(collections)
 }
@@ -96,14 +98,59 @@ pub fn persist_change(
     record: &WalRecord,
 ) -> Result<PersistOutcome, PersistenceError> {
     append_wal_record(wal_path, record)?;
-    checkpoint_snapshot(snapshot_path, wal_path, collections)
+    checkpoint_snapshot_legacy(snapshot_path, wal_path, collections)
 }
 
 pub fn append_wal_record(wal_path: &Path, record: &WalRecord) -> Result<(), PersistenceError> {
-    append_wal(wal_path, record)
+    append_wal_record_with_sync(wal_path, record, true)
+}
+
+pub fn append_wal_record_with_sync(
+    wal_path: &Path,
+    record: &WalRecord,
+    sync_on_write: bool,
+) -> Result<(), PersistenceError> {
+    append_wal(wal_path, record, sync_on_write)
 }
 
 pub fn checkpoint_snapshot(
+    snapshot_path: &Path,
+    wal_path: &Path,
+    collections: &BTreeMap<String, Collection>,
+) -> Result<PersistOutcome, PersistenceError> {
+    checkpoint_snapshot_with_policy(
+        snapshot_path,
+        wal_path,
+        collections,
+        CheckpointPolicy::default(),
+    )
+}
+
+pub fn checkpoint_snapshot_with_policy(
+    snapshot_path: &Path,
+    wal_path: &Path,
+    collections: &BTreeMap<String, Collection>,
+    policy: CheckpointPolicy,
+) -> Result<PersistOutcome, PersistenceError> {
+    incremental::checkpoint_snapshot_with_policy(snapshot_path, wal_path, collections, policy)
+}
+
+pub fn checkpoint_wal(
+    snapshot_path: &Path,
+    wal_path: &Path,
+) -> Result<PersistOutcome, PersistenceError> {
+    incremental::checkpoint_wal(snapshot_path, wal_path)
+}
+
+pub fn checkpoint_wal_with_policy(
+    snapshot_path: &Path,
+    wal_path: &Path,
+    policy: CheckpointPolicy,
+) -> Result<(), PersistenceError> {
+    incremental::checkpoint_wal_with_policy(snapshot_path, wal_path, policy)
+}
+
+fn checkpoint_snapshot_legacy(
     snapshot_path: &Path,
     wal_path: &Path,
     collections: &BTreeMap<String, Collection>,
@@ -136,7 +183,15 @@ pub fn apply_wal_record(
                 )));
             }
 
-            let config = CollectionConfig::new(*dimension, *strict_finite)?;
+            let config = match CollectionConfig::new(*dimension, *strict_finite) {
+                Ok(config) => config,
+                Err(CollectionError::InvalidConfig(_)) => {
+                    // Tolerate legacy poisoned WAL create records (e.g. dimension=0)
+                    // so startup can still recover the rest of the state.
+                    return Ok(());
+                }
+                Err(error) => return Err(error.into()),
+            };
             let collection = Collection::new(name.clone(), config)?;
             collections.insert(name.clone(), collection);
             Ok(())
@@ -149,11 +204,16 @@ pub fn apply_wal_record(
             collection,
             id,
             values,
+            payload,
         } => {
             let target = collections.get_mut(collection).ok_or_else(|| {
                 PersistenceError::InvalidData(format!("collection '{collection}' does not exist"))
             })?;
-            target.upsert_point(*id, values.clone())?;
+            target.upsert_point_with_payload(
+                *id,
+                values.clone(),
+                payload.clone().unwrap_or_default(),
+            )?;
             Ok(())
         }
         WalRecord::DeletePoint { collection, id } => {
@@ -164,56 +224,6 @@ pub fn apply_wal_record(
             Ok(())
         }
     }
-}
-
-fn append_wal(path: &Path, record: &WalRecord) -> Result<(), PersistenceError> {
-    ensure_parent_dir(path)?;
-
-    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-    serde_json::to_writer(&mut file, record)?;
-    file.write_all(b"\n")?;
-    file.flush()?;
-    Ok(())
-}
-
-fn truncate_wal(path: &Path) -> Result<(), PersistenceError> {
-    ensure_parent_dir(path)?;
-    fs::write(path, b"")?;
-    Ok(())
-}
-
-fn replay_wal(
-    path: &Path,
-    collections: &mut BTreeMap<String, Collection>,
-) -> Result<(), PersistenceError> {
-    if !path.exists() {
-        return Ok(());
-    }
-
-    let file = File::open(path)?;
-    for (index, line) in BufReader::new(file).lines().enumerate() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let record: WalRecord = serde_json::from_str(&line).map_err(|error| {
-            PersistenceError::InvalidData(format!("invalid wal line {}: {error}", index + 1))
-        })?;
-
-        apply_wal_record(collections, &record)?;
-    }
-
-    Ok(())
-}
-
-fn ensure_parent_dir(path: &Path) -> Result<(), PersistenceError> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

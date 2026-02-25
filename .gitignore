@@ -12,6 +12,9 @@ __pycache__/
 .venv/
 venv/
 
+# Local runtime data.
+data/
+
 # Node artifacts.
 node_modules/
 

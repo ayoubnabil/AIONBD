@@ -15,6 +15,8 @@ fn test_state() -> AppState {
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
         max_concurrency: 256,
+        max_page_limit: 1_000,
+        max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: false,
         snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),

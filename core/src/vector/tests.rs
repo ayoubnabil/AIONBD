@@ -6,6 +6,23 @@ fn approx_eq(left: f32, right: f32) {
     assert!((left - right).abs() < EPSILON, "expected {left} ~= {right}");
 }
 
+fn approx_eq_tol(left: f32, right: f32, epsilon: f32) {
+    assert!((left - right).abs() < epsilon, "expected {left} ~= {right}");
+}
+
+fn deterministic_vector(seed: usize, len: usize) -> Vec<f32> {
+    (0..len)
+        .map(|index| {
+            let mixed = seed
+                .wrapping_mul(1_103_515_245)
+                .wrapping_add(index.wrapping_mul(12_345))
+                .wrapping_add(97);
+            let base = (mixed % 10_000) as f32 / 5_000.0;
+            base - 1.0
+        })
+        .collect()
+}
+
 #[test]
 fn dot_product_works() {
     let left = [1.0, 2.0, 3.0];
@@ -20,6 +37,15 @@ fn l2_distance_works() {
     let right = [1.0, 2.0, 6.0];
     let distance = l2_distance(&left, &right).expect("l2 distance should succeed");
     approx_eq(distance, 3.0);
+}
+
+#[test]
+fn l2_squared_works_without_sqrt_roundtrip() {
+    let left = [1.0, 2.0, 3.0];
+    let right = [1.0, 2.0, 6.0];
+    let squared = l2_squared_with_options(&left, &right, VectorValidationOptions::strict())
+        .expect("l2 squared should succeed");
+    approx_eq(squared, 9.0);
 }
 
 #[test]
@@ -115,4 +141,35 @@ fn large_dimension_smoke() {
     let right = vec![2.0f32; 4096];
     let value = dot_product(&left, &right).expect("must succeed");
     approx_eq(value, 8192.0);
+}
+
+#[test]
+fn simd_paths_match_scalar_reference_across_varied_dimensions() {
+    for len in [1usize, 2, 3, 7, 8, 9, 15, 16, 17, 31, 32, 33, 127, 128, 129] {
+        let left = deterministic_vector(11, len);
+        let right = deterministic_vector(29, len);
+
+        let dot = dot_product(&left, &right).expect("dot must succeed");
+        let dot_reference: f32 = left.iter().zip(&right).map(|(l, r)| l * r).sum();
+        approx_eq_tol(dot, dot_reference, 1e-3);
+
+        let l2 = l2_distance(&left, &right).expect("l2 must succeed");
+        let l2_reference = left
+            .iter()
+            .zip(&right)
+            .map(|(l, r)| {
+                let delta = l - r;
+                delta * delta
+            })
+            .sum::<f32>()
+            .sqrt();
+        approx_eq_tol(l2, l2_reference, 1e-4);
+
+        let cosine = cosine_similarity(&left, &right).expect("cosine must succeed");
+        let dot_ref: f32 = left.iter().zip(&right).map(|(l, r)| l * r).sum();
+        let left_norm: f32 = left.iter().map(|value| value * value).sum::<f32>().sqrt();
+        let right_norm: f32 = right.iter().map(|value| value * value).sum::<f32>().sqrt();
+        let cosine_reference = dot_ref / (left_norm * right_norm);
+        approx_eq_tol(cosine, cosine_reference, 1e-4);
+    }
 }

@@ -12,6 +12,8 @@ pub(crate) struct AppConfig {
     pub(crate) request_timeout_ms: u64,
     pub(crate) max_body_bytes: usize,
     pub(crate) max_concurrency: usize,
+    pub(crate) max_page_limit: usize,
+    pub(crate) max_topk_limit: usize,
     pub(crate) checkpoint_interval: usize,
     pub(crate) persistence_enabled: bool,
     pub(crate) snapshot_path: PathBuf,
@@ -26,6 +28,8 @@ impl AppConfig {
         let request_timeout_ms = parse_u64("AIONBD_REQUEST_TIMEOUT_MS", 2000)?;
         let max_body_bytes = parse_usize("AIONBD_MAX_BODY_BYTES", 1_048_576)?;
         let max_concurrency = parse_usize("AIONBD_MAX_CONCURRENCY", 256)?;
+        let max_page_limit = parse_usize("AIONBD_MAX_PAGE_LIMIT", 1000)?;
+        let max_topk_limit = parse_usize("AIONBD_MAX_TOPK_LIMIT", 1000)?;
         let checkpoint_interval = parse_usize("AIONBD_CHECKPOINT_INTERVAL", 32)?;
         let persistence_enabled = parse_bool("AIONBD_PERSISTENCE_ENABLED", true)?;
         let snapshot_path = parse_path("AIONBD_SNAPSHOT_PATH", "data/aionbd_snapshot.json")?;
@@ -40,6 +44,12 @@ impl AppConfig {
         if max_concurrency == 0 {
             anyhow::bail!("AIONBD_MAX_CONCURRENCY must be > 0");
         }
+        if max_page_limit == 0 {
+            anyhow::bail!("AIONBD_MAX_PAGE_LIMIT must be > 0");
+        }
+        if max_topk_limit == 0 {
+            anyhow::bail!("AIONBD_MAX_TOPK_LIMIT must be > 0");
+        }
         if checkpoint_interval == 0 {
             anyhow::bail!("AIONBD_CHECKPOINT_INTERVAL must be > 0");
         }
@@ -51,6 +61,8 @@ impl AppConfig {
             request_timeout_ms,
             max_body_bytes,
             max_concurrency,
+            max_page_limit,
+            max_topk_limit,
             checkpoint_interval,
             persistence_enabled,
             snapshot_path,
@@ -100,4 +112,173 @@ fn parse_path(key: &str, default: &str) -> Result<PathBuf> {
         anyhow::bail!("{key} must not be empty");
     }
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    const CONFIG_KEYS: &[&str] = &[
+        "AIONBD_BIND",
+        "AIONBD_MAX_DIMENSION",
+        "AIONBD_STRICT_FINITE",
+        "AIONBD_REQUEST_TIMEOUT_MS",
+        "AIONBD_MAX_BODY_BYTES",
+        "AIONBD_MAX_CONCURRENCY",
+        "AIONBD_MAX_PAGE_LIMIT",
+        "AIONBD_MAX_TOPK_LIMIT",
+        "AIONBD_CHECKPOINT_INTERVAL",
+        "AIONBD_PERSISTENCE_ENABLED",
+        "AIONBD_SNAPSHOT_PATH",
+        "AIONBD_WAL_PATH",
+    ];
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct EnvGuard {
+        saved: Vec<(String, Option<String>)>,
+    }
+
+    impl EnvGuard {
+        fn capture(keys: &[&str]) -> Self {
+            let saved = keys
+                .iter()
+                .map(|key| ((*key).to_string(), env::var(key).ok()))
+                .collect();
+            Self { saved }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in &self.saved {
+                if let Some(value) = value {
+                    env::set_var(key, value);
+                } else {
+                    env::remove_var(key);
+                }
+            }
+        }
+    }
+
+    fn with_env<R>(pairs: &[(&str, &str)], f: impl FnOnce() -> R) -> R {
+        let _lock = env_lock().lock().expect("env test mutex must be lockable");
+        let _guard = EnvGuard::capture(CONFIG_KEYS);
+
+        for key in CONFIG_KEYS {
+            env::remove_var(key);
+        }
+        for (key, value) in pairs {
+            env::set_var(key, value);
+        }
+
+        f()
+    }
+
+    #[test]
+    fn from_env_uses_expected_defaults() {
+        let config = with_env(&[], || {
+            AppConfig::from_env().expect("default config must parse")
+        });
+
+        assert_eq!(
+            config.bind,
+            "127.0.0.1:8080"
+                .parse::<SocketAddr>()
+                .expect("default bind should parse")
+        );
+        assert_eq!(config.max_dimension, 4096);
+        assert!(config.strict_finite);
+        assert_eq!(config.request_timeout_ms, 2000);
+        assert_eq!(config.max_body_bytes, 1_048_576);
+        assert_eq!(config.max_concurrency, 256);
+        assert_eq!(config.max_page_limit, 1000);
+        assert_eq!(config.max_topk_limit, 1000);
+        assert_eq!(config.checkpoint_interval, 32);
+        assert!(config.persistence_enabled);
+        assert_eq!(
+            config.snapshot_path,
+            PathBuf::from("data/aionbd_snapshot.json")
+        );
+        assert_eq!(config.wal_path, PathBuf::from("data/aionbd_wal.jsonl"));
+    }
+
+    #[test]
+    fn from_env_applies_overrides() {
+        let config = with_env(
+            &[
+                ("AIONBD_BIND", "0.0.0.0:9090"),
+                ("AIONBD_MAX_DIMENSION", "128"),
+                ("AIONBD_STRICT_FINITE", "false"),
+                ("AIONBD_REQUEST_TIMEOUT_MS", "5000"),
+                ("AIONBD_MAX_BODY_BYTES", "2048"),
+                ("AIONBD_MAX_CONCURRENCY", "32"),
+                ("AIONBD_MAX_PAGE_LIMIT", "12"),
+                ("AIONBD_MAX_TOPK_LIMIT", "34"),
+                ("AIONBD_CHECKPOINT_INTERVAL", "2"),
+                ("AIONBD_PERSISTENCE_ENABLED", "off"),
+                ("AIONBD_SNAPSHOT_PATH", "/tmp/custom_snapshot.json"),
+                ("AIONBD_WAL_PATH", "/tmp/custom_wal.jsonl"),
+            ],
+            || AppConfig::from_env().expect("override config must parse"),
+        );
+
+        assert_eq!(
+            config.bind,
+            "0.0.0.0:9090"
+                .parse::<SocketAddr>()
+                .expect("override bind should parse")
+        );
+        assert_eq!(config.max_dimension, 128);
+        assert!(!config.strict_finite);
+        assert_eq!(config.request_timeout_ms, 5000);
+        assert_eq!(config.max_body_bytes, 2048);
+        assert_eq!(config.max_concurrency, 32);
+        assert_eq!(config.max_page_limit, 12);
+        assert_eq!(config.max_topk_limit, 34);
+        assert_eq!(config.checkpoint_interval, 2);
+        assert!(!config.persistence_enabled);
+        assert_eq!(
+            config.snapshot_path,
+            PathBuf::from("/tmp/custom_snapshot.json")
+        );
+        assert_eq!(config.wal_path, PathBuf::from("/tmp/custom_wal.jsonl"));
+    }
+
+    #[test]
+    fn from_env_rejects_zero_max_page_limit() {
+        let error = with_env(&[("AIONBD_MAX_PAGE_LIMIT", "0")], || {
+            AppConfig::from_env().expect_err("zero max page limit must fail")
+        });
+
+        assert!(error
+            .to_string()
+            .contains("AIONBD_MAX_PAGE_LIMIT must be > 0"));
+    }
+
+    #[test]
+    fn from_env_rejects_zero_max_topk_limit() {
+        let error = with_env(&[("AIONBD_MAX_TOPK_LIMIT", "0")], || {
+            AppConfig::from_env().expect_err("zero max top-k limit must fail")
+        });
+
+        assert!(error
+            .to_string()
+            .contains("AIONBD_MAX_TOPK_LIMIT must be > 0"));
+    }
+
+    #[test]
+    fn from_env_rejects_invalid_bool() {
+        let error = with_env(&[("AIONBD_STRICT_FINITE", "not-a-bool")], || {
+            AppConfig::from_env().expect_err("invalid bool must fail")
+        });
+
+        assert!(error
+            .to_string()
+            .contains("AIONBD_STRICT_FINITE must be a boolean"));
+    }
 }

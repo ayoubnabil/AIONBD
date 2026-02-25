@@ -6,32 +6,18 @@ on:
   pull_request:
 
 jobs:
-  rust:
+  verify-local:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: File size guard
-        run: ./scripts/check_file_sizes.sh
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Format check
-        run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Test
-        run: cargo test --workspace
-
-  python-sdk-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install SDK
-        run: python -m pip install -e sdk/python
-      - name: Import smoke test
-        run: python -c "from aionbd import AionBDClient; print(AionBDClient)"
+      - name: File size guard
+        run: ./scripts/check_file_sizes.sh
+      - name: Unified verification
+        run: ./scripts/verify_local.sh

@@ -120,6 +120,42 @@ fn point_ids_page_respects_offset_and_limit() {
 }
 
 #[test]
+fn point_ids_page_after_respects_cursor_and_limit() {
+    let mut collection = new_collection(true);
+    for id in [10_u64, 30, 50, 70] {
+        collection
+            .upsert_point(id, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+    }
+
+    let (first_page, first_next) = collection.point_ids_page_after(None, 2);
+    assert_eq!(first_page, vec![10, 30]);
+    assert_eq!(first_next, Some(30));
+
+    let (second_page, second_next) = collection.point_ids_page_after(first_next, 2);
+    assert_eq!(second_page, vec![50, 70]);
+    assert_eq!(second_next, None);
+}
+
+#[test]
+fn point_ids_page_after_handles_missing_cursor_and_zero_limit() {
+    let mut collection = new_collection(true);
+    for id in [10_u64, 20, 30] {
+        collection
+            .upsert_point(id, vec![1.0, 2.0, 3.0])
+            .expect("must succeed");
+    }
+
+    let (empty_page, empty_next) = collection.point_ids_page_after(Some(999), 2);
+    assert!(empty_page.is_empty());
+    assert_eq!(empty_next, None);
+
+    let (zero_page, zero_next) = collection.point_ids_page_after(None, 0);
+    assert!(zero_page.is_empty());
+    assert_eq!(zero_next, None);
+}
+
+#[test]
 fn iter_points_is_sorted_and_contains_payloads() {
     let mut collection = new_collection(true);
     collection
@@ -158,4 +194,42 @@ fn mutation_version_only_changes_on_mutations() {
 
     let _ = collection.remove_point(1);
     assert_eq!(collection.mutation_version(), after_insert + 1);
+}
+
+#[test]
+fn mutation_version_saturates_instead_of_wrapping() {
+    let mut collection = new_collection(true);
+    collection.mutation_version = u64::MAX - 1;
+
+    collection
+        .upsert_point(1, vec![1.0, 2.0, 3.0])
+        .expect("must succeed");
+    assert_eq!(collection.mutation_version(), u64::MAX);
+
+    let _ = collection.remove_point(1);
+    assert_eq!(collection.mutation_version(), u64::MAX);
+}
+
+#[test]
+fn supports_payload_and_rejects_empty_payload_key() {
+    let mut collection = new_collection(true);
+    let mut payload = std::collections::BTreeMap::new();
+    payload.insert(
+        "tenant".to_string(),
+        crate::MetadataValue::String("edge".to_string()),
+    );
+
+    let inserted = collection
+        .upsert_point_with_payload(7, vec![1.0, 2.0, 3.0], payload.clone())
+        .expect("upsert with payload should succeed");
+    assert!(inserted);
+
+    assert_eq!(collection.get_payload(7), Some(&payload));
+
+    let mut invalid_payload = std::collections::BTreeMap::new();
+    invalid_payload.insert(" ".to_string(), crate::MetadataValue::Bool(true));
+    let error = collection
+        .upsert_point_with_payload(8, vec![1.0, 2.0, 3.0], invalid_payload)
+        .expect_err("payload with blank key must fail");
+    assert!(matches!(error, CollectionError::InvalidPayloadKey));
 }

@@ -22,6 +22,13 @@ Test:
 cargo test --workspace
 ```
 
+Full local verification:
+```bash
+./scripts/verify_local.sh
+./scripts/verify_local.sh --fast
+./scripts/verify_local.sh --changed
+```
+
 Run API:
 ```bash
 cargo run -p aionbd-server
@@ -38,6 +45,8 @@ AIONBD_BENCH_SCENARIO=all cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=dot cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=l2 cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
+AIONBD_BENCH_SCENARIO=list_points cargo run --release -p aionbd-bench
+AIONBD_BENCH_SCENARIO=search_quality cargo run --release -p aionbd-bench
 ```
 
 ## Server runtime configuration
@@ -48,6 +57,8 @@ AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
 - `AIONBD_REQUEST_TIMEOUT_MS` (default: `2000`)
 - `AIONBD_MAX_BODY_BYTES` (default: `1048576`)
 - `AIONBD_MAX_CONCURRENCY` (default: `256`)
+- `AIONBD_MAX_PAGE_LIMIT` (default: `1000`)
+- `AIONBD_MAX_TOPK_LIMIT` (default: `1000`)
 - `AIONBD_CHECKPOINT_INTERVAL` (default: `32`)
 - `AIONBD_PERSISTENCE_ENABLED` (default: `true`)
 - `AIONBD_SNAPSHOT_PATH` (default: `data/aionbd_snapshot.json`)
@@ -62,10 +73,15 @@ AIONBD_BENCH_SCENARIO=collection cargo run --release -p aionbd-bench
 - `GET /collections`: list collections
 - `GET /collections/:name`: collection metadata
 - `DELETE /collections/:name`: delete collection
-- `POST /collections/:name/search`: top-1 search `{query, metric}`
-- `POST /collections/:name/search/topk`: top-k search `{query, metric, limit}`
-- `GET /collections/:name/points`: list point ids `?offset=<n>&limit=<n>`
-- `PUT /collections/:name/points/:id`: upsert point `{values}`
+- `POST /collections/:name/search`: top-1 search
+  `{query, metric, mode, target_recall, filter}`
+- `POST /collections/:name/search/topk`: top-k search
+  `{query, metric, limit, mode, target_recall, filter}`
+  with `limit <= AIONBD_MAX_TOPK_LIMIT` (default `10` when omitted, capped by config)
+- `GET /collections/:name/points`: list point ids with pagination:
+  `?offset=<n>&limit=<n>` (offset mode) or `?after_id=<id>&limit=<n>` (cursor mode),
+  with `limit <= AIONBD_MAX_PAGE_LIMIT` (default `100` when omitted, capped by config)
+- `PUT /collections/:name/points/:id`: upsert point `{values, payload}`
 - `GET /collections/:name/points/:id`: read point
 - `DELETE /collections/:name/points/:id`: delete point
 

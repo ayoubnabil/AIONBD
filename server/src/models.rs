@@ -1,4 +1,11 @@
+use std::collections::BTreeMap;
+
+use aionbd_core::MetadataValue;
 use serde::{Deserialize, Serialize};
+
+pub(crate) const DEFAULT_TOPK_LIMIT: usize = 10;
+pub(crate) const DEFAULT_PAGE_LIMIT: usize = 100;
+pub(crate) type PointPayload = BTreeMap<String, MetadataValue>;
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, Default)]
 #[serde(rename_all = "snake_case")]
@@ -7,6 +14,15 @@ pub(crate) enum Metric {
     Dot,
     L2,
     Cosine,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SearchMode {
+    Exact,
+    Ivf,
+    #[default]
+    Auto,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +58,36 @@ pub(crate) struct ReadyResponse {
     pub(crate) checks: ReadyChecks,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct MetricsResponse {
+    pub(crate) uptime_ms: u64,
+    pub(crate) ready: bool,
+    pub(crate) engine_loaded: bool,
+    pub(crate) storage_available: bool,
+    pub(crate) http_requests_total: u64,
+    pub(crate) http_requests_in_flight: u64,
+    pub(crate) http_responses_2xx_total: u64,
+    pub(crate) http_responses_4xx_total: u64,
+    pub(crate) http_requests_5xx_total: u64,
+    pub(crate) http_request_duration_us_total: u64,
+    pub(crate) http_request_duration_us_max: u64,
+    pub(crate) http_request_duration_us_avg: f64,
+    pub(crate) collections: usize,
+    pub(crate) points: usize,
+    pub(crate) l2_indexes: usize,
+    pub(crate) l2_index_cache_lookups: u64,
+    pub(crate) l2_index_cache_hits: u64,
+    pub(crate) l2_index_cache_misses: u64,
+    pub(crate) l2_index_cache_hit_ratio: f64,
+    pub(crate) l2_index_build_requests: u64,
+    pub(crate) l2_index_build_successes: u64,
+    pub(crate) l2_index_build_failures: u64,
+    pub(crate) l2_index_build_in_flight: usize,
+    pub(crate) persistence_enabled: bool,
+    pub(crate) persistence_writes: u64,
+    pub(crate) persistence_checkpoint_degraded_total: u64,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct CreateCollectionRequest {
     pub(crate) name: String,
@@ -66,6 +112,8 @@ pub(crate) struct ListCollectionsResponse {
 #[derive(Debug, Deserialize)]
 pub(crate) struct UpsertPointRequest {
     pub(crate) values: Vec<f32>,
+    #[serde(default)]
+    pub(crate) payload: PointPayload,
 }
 
 #[derive(Debug, Serialize)]
@@ -78,6 +126,7 @@ pub(crate) struct UpsertPointResponse {
 pub(crate) struct PointResponse {
     pub(crate) id: u64,
     pub(crate) values: Vec<f32>,
+    pub(crate) payload: PointPayload,
 }
 
 #[derive(Debug, Serialize)]
@@ -96,8 +145,10 @@ pub(crate) struct DeleteCollectionResponse {
 pub(crate) struct ListPointsQuery {
     #[serde(default)]
     pub(crate) offset: usize,
-    #[serde(default = "default_page_limit")]
-    pub(crate) limit: usize,
+    #[serde(default)]
+    pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) after_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -110,6 +161,7 @@ pub(crate) struct ListPointsResponse {
     pub(crate) points: Vec<PointIdResponse>,
     pub(crate) total: usize,
     pub(crate) next_offset: Option<usize>,
+    pub(crate) next_after_id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,6 +169,12 @@ pub(crate) struct SearchRequest {
     pub(crate) query: Vec<f32>,
     #[serde(default)]
     pub(crate) metric: Metric,
+    #[serde(default)]
+    pub(crate) mode: SearchMode,
+    #[serde(default)]
+    pub(crate) target_recall: Option<f32>,
+    #[serde(default)]
+    pub(crate) filter: Option<SearchFilter>,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,6 +182,11 @@ pub(crate) struct SearchResponse {
     pub(crate) id: u64,
     pub(crate) metric: Metric,
     pub(crate) value: f32,
+    pub(crate) mode: SearchMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) recall_at_k: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) payload: Option<PointPayload>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,30 +194,71 @@ pub(crate) struct SearchTopKRequest {
     pub(crate) query: Vec<f32>,
     #[serde(default)]
     pub(crate) metric: Metric,
-    #[serde(default = "default_limit")]
-    pub(crate) limit: usize,
+    #[serde(default)]
+    pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) mode: SearchMode,
+    #[serde(default)]
+    pub(crate) target_recall: Option<f32>,
+    #[serde(default)]
+    pub(crate) filter: Option<SearchFilter>,
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct SearchHit {
     pub(crate) id: u64,
     pub(crate) value: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) payload: Option<PointPayload>,
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct SearchTopKResponse {
     pub(crate) metric: Metric,
+    pub(crate) mode: SearchMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) recall_at_k: Option<f32>,
     pub(crate) hits: Vec<SearchHit>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct SearchFilter {
+    #[serde(default)]
+    pub(crate) must: Vec<FilterClause>,
+    #[serde(default)]
+    pub(crate) should: Vec<FilterClause>,
+    #[serde(default)]
+    pub(crate) minimum_should_match: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub(crate) enum FilterClause {
+    Match(FilterMatchClause),
+    Range(FilterRangeClause),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FilterMatchClause {
+    pub(crate) field: String,
+    pub(crate) value: MetadataValue,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FilterRangeClause {
+    pub(crate) field: String,
+    #[serde(default)]
+    pub(crate) gt: Option<f64>,
+    #[serde(default)]
+    pub(crate) gte: Option<f64>,
+    #[serde(default)]
+    pub(crate) lt: Option<f64>,
+    #[serde(default)]
+    pub(crate) lte: Option<f64>,
 }
 
 const fn default_true() -> bool {
     true
-}
-
-const fn default_limit() -> usize {
-    10
-}
-
-const fn default_page_limit() -> usize {
-    100
 }

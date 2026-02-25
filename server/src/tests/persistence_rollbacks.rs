@@ -48,6 +48,8 @@ fn test_state(snapshot_path: PathBuf, wal_path: PathBuf) -> AppState {
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
         max_concurrency: 256,
+        max_page_limit: 1_000,
+        max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: true,
         snapshot_path,
@@ -103,6 +105,37 @@ async fn failed_persist_rolls_back_upsert_mutation() {
         .await
         .expect("response expected");
     assert_eq!(get_resp.status(), StatusCode::NOT_FOUND);
+
+    cleanup_dir(&root);
+}
+
+#[tokio::test]
+async fn invalid_create_collection_does_not_write_wal_record() {
+    let (root, snapshot_path, wal_path) = persistence_paths();
+    let app = build_app(test_state(snapshot_path, wal_path.clone()));
+
+    let create_req = Request::builder()
+        .method("POST")
+        .uri("/collections")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"name": "bad_create", "dimension": 0}).to_string(),
+        ))
+        .expect("request must build");
+    let create_resp = app
+        .clone()
+        .oneshot(create_req)
+        .await
+        .expect("response expected");
+    assert_eq!(create_resp.status(), StatusCode::BAD_REQUEST);
+
+    if wal_path.exists() {
+        let wal_body = fs::read_to_string(&wal_path).expect("wal should be readable");
+        assert!(
+            wal_body.trim().is_empty(),
+            "wal should not contain an invalid create record"
+        );
+    }
 
     cleanup_dir(&root);
 }
