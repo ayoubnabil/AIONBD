@@ -46,8 +46,8 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`); async checkpoint scheduling is opt-in (`AIONBD_ASYNC_CHECKPOINTS=true`).
 - Search supports explicit modes (`exact`, `ivf`, `auto`) with target recall guarantees
   and metadata filtering (`must`/`should` + range clauses).
-- Benchmark pipeline publishes dataset comparative tables (`recall@k`, p50/p95/p99,
-  memory cost) to `bench/reports/`.
+- Benchmark pipelines publish comparative tables (`recall@k`, p50/p95/p99,
+  memory cost, WAL write-path throughput/latency) to `bench/reports/`.
 - Bench scenarios include persistence write-path profiling (`AIONBD_BENCH_SCENARIO=persistence_write`)
   to compare fsync policies and grouped WAL append behavior.
 - Point payload metadata is supported on upsert/get/search responses.

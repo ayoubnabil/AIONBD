@@ -51,7 +51,7 @@ AIONBD_BENCH_SCENARIO=persistence_write cargo run --release -p aionbd-bench
 AIONBD_BENCH_SCENARIO=search_quality cargo run --release -p aionbd-bench
 ```
 
-Search quality benchmark pipeline (publishes dataset comparison tables + JSON):
+Benchmark pipelines (search quality + persistence write reports):
 ```bash
 ./scripts/verify_bench.sh
 ```
@@ -70,6 +70,8 @@ AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO=1.50 \
 Optional report output paths:
 - `AIONBD_BENCH_REPORT_PATH` (default: `bench/reports/search_quality_report.md`)
 - `AIONBD_BENCH_REPORT_JSON_PATH` (default: `bench/reports/search_quality_report.json`)
+- `AIONBD_BENCH_PERSISTENCE_REPORT_PATH` (default: `bench/reports/persistence_write_report.md`)
+- `AIONBD_BENCH_PERSISTENCE_REPORT_JSON_PATH` (default: `bench/reports/persistence_write_report.json`)
 
 Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_BENCH_MIN_RECALL_IVF=0.90`
@@ -78,6 +80,12 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_BENCH_MAX_P95_RATIO_AUTO=1.00`
 - `AIONBD_BENCH_MAX_MEMORY_RATIO_IVF=1.50`
 - `AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO=1.50`
+- `AIONBD_BENCH_MIN_QPS_RATIO_SINGLE_SYNC_EVERY_N=2.00`
+- `AIONBD_BENCH_MIN_QPS_RATIO_GROUP_SYNC_EACH_BATCH=1.20`
+- `AIONBD_BENCH_MIN_QPS_RATIO_GROUP_SYNC_EVERY_N=1.50`
+- `AIONBD_BENCH_MAX_WAL_RATIO_SINGLE_SYNC_EVERY_N=1.10`
+- `AIONBD_BENCH_MAX_WAL_RATIO_GROUP_SYNC_EACH_BATCH=1.10`
+- `AIONBD_BENCH_MAX_WAL_RATIO_GROUP_SYNC_EVERY_N=1.10`
 
 ## Server runtime configuration
 
