@@ -13,7 +13,9 @@ from pathlib import Path
 SCRIPT = Path("scripts/run_soak_pipeline.py")
 
 
-def run(args: list[str], expect_ok: bool, extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def run(
+    args: list[str], expect_ok: bool, extra_env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     if extra_env:
         env.update(extra_env)
@@ -40,6 +42,10 @@ def main() -> int:
     if not SCRIPT.exists():
         print(f"error=missing_script path={SCRIPT}", file=sys.stderr)
         return 1
+    longrun_profiles = Path("ops/soak/longrun_profiles.json")
+    if not longrun_profiles.exists():
+        print(f"error=missing_profiles path={longrun_profiles}", file=sys.stderr)
+        return 1
 
     with tempfile.TemporaryDirectory(prefix="aionbd_soak_pipeline_smoke_") as temp_dir:
         root = Path(temp_dir)
@@ -51,6 +57,20 @@ def main() -> int:
                 "--dry-run",
                 "--profiles",
                 "read_heavy,mixed",
+                "--report-path",
+                str(report_md),
+                "--report-json-path",
+                str(report_json),
+            ],
+            expect_ok=True,
+        )
+        run(
+            [
+                "--dry-run",
+                "--profiles-file",
+                str(longrun_profiles),
+                "--profiles",
+                "read_heavy_24h,mixed_72h",
                 "--report-path",
                 str(report_md),
                 "--report-json-path",

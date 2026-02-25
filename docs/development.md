@@ -236,6 +236,16 @@ python3 scripts/run_soak_pipeline.py \
   --report-json-path bench/reports/soak_pipeline_report.json
 ```
 
+Run long soak profiles from file (24h/72h template):
+```bash
+python3 scripts/run_soak_pipeline.py \
+  --base-url http://127.0.0.1:8080 \
+  --collection-prefix soak_longrun \
+  --profiles-file ops/soak/longrun_profiles.json \
+  --report-path bench/reports/soak_longrun_report.md \
+  --report-json-path bench/reports/soak_longrun_report.json
+```
+
 Quick dry-run validation of soak pipeline:
 ```bash
 python3 scripts/check_soak_pipeline_smoke.py

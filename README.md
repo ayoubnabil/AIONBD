@@ -61,6 +61,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Collection export/import helpers are available via `scripts/collection_export_import.py` (with smoke check `scripts/check_collection_export_import_smoke.py`).
 - A mixed read/write soak harness is available via `scripts/run_soak_test.py` (with smoke check `scripts/check_soak_harness_smoke.py`).
 - Soak profile pipeline reporting is available via `scripts/run_soak_pipeline.py` (wrapper: `scripts/verify_soak.sh`, smoke: `scripts/check_soak_pipeline_smoke.py`).
+- A long-run soak profile template is versioned at `ops/soak/longrun_profiles.json`.
 - Optional TLS termination is supported in-process via rustls (`AIONBD_TLS_ENABLED=true` with cert/key paths).
 - Production guides are available in `docs/production_sizing.md`, `docs/performance_tuning.md`, and `docs/security_notes.md`.
 - IVF async rebuild cooldown is configurable (`AIONBD_L2_INDEX_BUILD_COOLDOWN_MS`, default `1000`).
