@@ -7,7 +7,7 @@ use tokio::task;
 use crate::auth::TenantContext;
 use crate::errors::{map_collection_error, map_json_rejection, ApiError};
 use crate::handler_utils::{
-    build_collection_response, canonical_collection_name, collection_handle, collection_write_lock,
+    build_collection_response, canonical_collection_name, collection_write_lock,
     existing_collection_write_lock, remove_collection_write_lock, scoped_collection_name,
     visible_collection_name,
 };
@@ -22,8 +22,8 @@ use crate::tenant_quota::{
     acquire_tenant_quota_guard, tenant_collection_count, tenant_point_count,
 };
 use crate::write_path::{
-    apply_upsert, collection_exists, insert_collection, load_collection_handle, precheck_upsert,
-    remove_collection,
+    apply_upsert, collection_exists, insert_collection, load_collection_handle,
+    load_tenant_collection_handle, precheck_upsert, remove_collection,
 };
 
 const HARD_MAX_POINTS_PER_COLLECTION: usize = 1_000_000;
@@ -150,11 +150,8 @@ pub(crate) async fn get_collection(
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
     let response_name = canonical_collection_name(&name)?;
-    let state_for_get = state.clone();
-    let tenant_for_get = tenant.clone();
-    let name_for_get = name.clone();
+    let (_, handle) = load_tenant_collection_handle(state, name, tenant).await?;
     let mut response = task::spawn_blocking(move || {
-        let (_, handle) = collection_handle(&state_for_get, &name_for_get, &tenant_for_get)?;
         let collection = handle
             .read()
             .map_err(|_| ApiError::internal("collection lock poisoned"))?;

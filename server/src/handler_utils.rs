@@ -7,7 +7,7 @@ use crate::auth::{AuthMode, TenantContext};
 use crate::config::AppConfig;
 use crate::errors::ApiError;
 use crate::models::{CollectionResponse, DistanceRequest, PointPayload};
-use crate::state::{AppState, CollectionHandle};
+use crate::state::AppState;
 
 pub(crate) fn validate_distance_request(
     payload: &DistanceRequest,
@@ -102,30 +102,6 @@ pub(crate) fn validate_upsert_input(
     }
 
     Ok(())
-}
-
-pub(crate) fn collection_handle(
-    state: &AppState,
-    raw_name: &str,
-    tenant: &TenantContext,
-) -> Result<(String, CollectionHandle), ApiError> {
-    let scoped_name = scoped_collection_name(state, raw_name, tenant)?;
-    let handle = collection_handle_by_name(state, &scoped_name)?;
-    Ok((scoped_name, handle))
-}
-
-pub(crate) fn collection_handle_by_name(
-    state: &AppState,
-    canonical_name: &str,
-) -> Result<CollectionHandle, ApiError> {
-    let collections = state
-        .collections
-        .read()
-        .map_err(|_| ApiError::internal("collection registry lock poisoned"))?;
-    collections
-        .get(canonical_name)
-        .cloned()
-        .ok_or_else(|| ApiError::not_found(format!("collection '{canonical_name}' not found")))
 }
 
 pub(crate) async fn collection_write_lock(
