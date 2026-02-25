@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use aionbd_core::{checkpoint_wal, load_collections, PersistOutcome};
+use aionbd_core::{checkpoint_wal_with_policy, load_collections, CheckpointPolicy};
 use anyhow::{Context, Result};
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::DefaultBodyLimit;
@@ -67,6 +67,7 @@ use crate::handlers_points::{delete_point, get_point, list_points};
 use crate::handlers_search::{search_collection, search_collection_top_k};
 use crate::http_metrics::track_http_metrics;
 use crate::index_manager::warmup_l2_indexes;
+use crate::persistence::configured_checkpoint_compact_after;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -204,14 +205,16 @@ async fn checkpoint_before_exit(state: &AppState) {
     }
     let snapshot_path = state.config.snapshot_path.clone();
     let wal_path = state.config.wal_path.clone();
-    let result =
-        tokio::task::spawn_blocking(move || checkpoint_wal(&snapshot_path, &wal_path)).await;
+    let checkpoint_policy = CheckpointPolicy {
+        incremental_compact_after: configured_checkpoint_compact_after(),
+    };
+    let result = tokio::task::spawn_blocking(move || {
+        checkpoint_wal_with_policy(&snapshot_path, &wal_path, checkpoint_policy)
+    })
+    .await;
     match result {
-        Ok(Ok(PersistOutcome::Checkpointed)) => {
+        Ok(Ok(())) => {
             tracing::info!("shutdown checkpoint completed");
-        }
-        Ok(Ok(PersistOutcome::WalOnly { reason })) => {
-            tracing::warn!(%reason, "shutdown checkpoint degraded to wal-only");
         }
         Ok(Err(error)) => {
             tracing::warn!(%error, "shutdown checkpoint failed");
