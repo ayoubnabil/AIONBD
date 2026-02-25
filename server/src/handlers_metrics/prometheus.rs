@@ -74,6 +74,9 @@ aionbd_l2_index_build_cooldown_skips {}\n\
 # HELP aionbd_l2_index_build_cooldown_ms Configured cooldown window in milliseconds for asynchronous L2 index rebuild scheduling.\n\
 # TYPE aionbd_l2_index_build_cooldown_ms gauge\n\
 aionbd_l2_index_build_cooldown_ms {}\n\
+# HELP aionbd_l2_index_warmup_on_boot L2 index warmup-on-boot flag (1 enabled, 0 disabled).\n\
+# TYPE aionbd_l2_index_warmup_on_boot gauge\n\
+aionbd_l2_index_warmup_on_boot {}\n\
 # HELP aionbd_l2_index_build_in_flight Number of currently running asynchronous L2 index builds.\n\
 # TYPE aionbd_l2_index_build_in_flight gauge\n\
 aionbd_l2_index_build_in_flight {}\n\
@@ -173,6 +176,7 @@ aionbd_max_points_per_collection {}\n",
         metrics.l2_index_build_failures,
         metrics.l2_index_build_cooldown_skips,
         metrics.l2_index_build_cooldown_ms,
+        bool_as_u8(metrics.l2_index_warmup_on_boot),
         metrics.l2_index_build_in_flight,
         metrics.auth_failures_total,
         metrics.rate_limit_rejections_total,

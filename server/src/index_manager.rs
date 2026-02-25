@@ -8,6 +8,7 @@ use crate::ivf_index::IvfIndex;
 use crate::state::AppState;
 
 const DEFAULT_L2_BUILD_COOLDOWN_MS: u64 = 1_000;
+const DEFAULT_L2_WARMUP_ON_BOOT: bool = true;
 
 pub(crate) fn record_l2_lookup_hit(state: &AppState) {
     let _ = state
@@ -76,6 +77,27 @@ pub(crate) fn configured_l2_build_cooldown_ms() -> u64 {
                     "invalid AIONBD_L2_INDEX_BUILD_COOLDOWN_MS; using default"
                 );
                 DEFAULT_L2_BUILD_COOLDOWN_MS
+            }
+        }
+    })
+}
+
+pub(crate) fn configured_l2_warmup_on_boot() -> bool {
+    static WARMUP_ON_BOOT: OnceLock<bool> = OnceLock::new();
+    *WARMUP_ON_BOOT.get_or_init(|| {
+        let Ok(raw) = std::env::var("AIONBD_L2_INDEX_WARMUP_ON_BOOT") else {
+            return DEFAULT_L2_WARMUP_ON_BOOT;
+        };
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => true,
+            "0" | "false" | "no" | "off" => false,
+            _ => {
+                tracing::warn!(
+                    %raw,
+                    default = DEFAULT_L2_WARMUP_ON_BOOT,
+                    "invalid AIONBD_L2_INDEX_WARMUP_ON_BOOT; using default"
+                );
+                DEFAULT_L2_WARMUP_ON_BOOT
             }
         }
     })
@@ -231,6 +253,10 @@ fn now_millis() -> u64 {
 }
 
 pub(crate) fn warmup_l2_indexes(state: &AppState) {
+    if !configured_l2_warmup_on_boot() {
+        return;
+    }
+
     let handles: Vec<(String, crate::state::CollectionHandle)> = state
         .collections
         .read()

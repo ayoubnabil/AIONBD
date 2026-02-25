@@ -92,6 +92,7 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_points 2"));
     assert!(payload.contains("aionbd_l2_indexes 0"));
     assert!(payload.contains("aionbd_l2_index_build_cooldown_ms 1000"));
+    assert!(payload.contains("aionbd_l2_index_warmup_on_boot 1"));
     assert!(payload.contains("aionbd_http_requests_total"));
     assert!(payload.contains("aionbd_http_requests_in_flight 1"));
     assert!(payload.contains("aionbd_http_responses_2xx_total 3"));
@@ -201,6 +202,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_http_request_duration_us_max 999999"));
     assert!(payload.contains("aionbd_http_request_duration_us_avg "));
     assert!(payload.contains("aionbd_l2_index_build_cooldown_ms 1000"));
+    assert!(payload.contains("aionbd_l2_index_warmup_on_boot 1"));
     assert!(payload.contains("aionbd_ready 0"));
     assert!(payload.contains("aionbd_engine_loaded 0"));
     assert!(payload.contains("aionbd_storage_available 0"));
