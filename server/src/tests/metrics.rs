@@ -107,6 +107,7 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["points"], 2);
     assert_eq!(payload["l2_indexes"], 0);
     assert_eq!(payload["l2_index_build_cooldown_ms"], 1_000);
+    assert_eq!(payload["l2_index_build_max_in_flight"], 2);
     assert_eq!(payload["l2_index_warmup_on_boot"], true);
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_wal_sync_on_write"], true);
@@ -282,6 +283,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["search_ivf_queries_total"], 8);
     assert_eq!(payload["search_ivf_fallback_exact_total"], 3);
     assert_eq!(payload["l2_index_build_cooldown_ms"], 1_000);
+    assert_eq!(payload["l2_index_build_max_in_flight"], 2);
     assert_eq!(payload["l2_index_warmup_on_boot"], true);
     assert_eq!(payload["max_points_per_collection"], 1_000_000);
 }

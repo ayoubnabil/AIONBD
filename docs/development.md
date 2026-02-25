@@ -112,6 +112,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_AUTH_TENANT_MAX_COLLECTIONS` (default: `0`, disabled when `0`)
 - `AIONBD_AUTH_TENANT_MAX_POINTS` (default: `0`, disabled when `0`)
 - `AIONBD_L2_INDEX_BUILD_COOLDOWN_MS` (default: `1000`; set `0` to disable cooldown throttling)
+- `AIONBD_L2_INDEX_BUILD_MAX_IN_FLIGHT` (default: `2`; maximum concurrent asynchronous IVF build jobs)
 - `AIONBD_L2_INDEX_WARMUP_ON_BOOT` (default: `true`; set `false` to skip startup warmup builds)
 
 ## API endpoints
