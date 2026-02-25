@@ -146,63 +146,6 @@ async fn search_mode_ivf_rejects_non_l2_metric() {
 }
 
 #[tokio::test]
-async fn search_recall_target_rejects_ivf_mode() {
-    let app = build_app(test_state());
-
-    let create_req = Request::builder()
-        .method("POST")
-        .uri("/collections")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            json!({"name": "search_recall", "dimension": 2}).to_string(),
-        ))
-        .expect("request must build");
-    let create_resp = app
-        .clone()
-        .oneshot(create_req)
-        .await
-        .expect("response expected");
-    assert_eq!(create_resp.status(), StatusCode::OK);
-
-    for id in 0..IvfIndex::min_indexed_points() as u64 {
-        let upsert_req = Request::builder()
-            .method("PUT")
-            .uri(format!("/collections/search_recall/points/{id}"))
-            .header("content-type", "application/json")
-            .body(Body::from(json!({"values": [id as f32, 0.0]}).to_string()))
-            .expect("request must build");
-        let upsert_resp = app
-            .clone()
-            .oneshot(upsert_req)
-            .await
-            .expect("response expected");
-        assert_eq!(upsert_resp.status(), StatusCode::OK);
-    }
-
-    let ivf_req = Request::builder()
-        .method("POST")
-        .uri("/collections/search_recall/search/topk")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            json!({
-                "query": [33.0, 12.0],
-                "metric": "l2",
-                "mode": "ivf",
-                "target_recall": 1.0,
-                "limit": 20
-            })
-            .to_string(),
-        ))
-        .expect("request must build");
-    let ivf_resp = app
-        .clone()
-        .oneshot(ivf_req)
-        .await
-        .expect("response expected");
-    assert_eq!(ivf_resp.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
 async fn search_mode_ivf_without_target_recall_avoids_quality_full_scan() {
     let state = test_state();
     let mut collection = Collection::new(

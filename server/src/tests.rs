@@ -26,6 +26,7 @@ mod persistence_degraded;
 mod persistence_rollbacks;
 mod search;
 mod search_advanced;
+mod search_recall;
 
 fn test_state() -> AppState {
     let config = AppConfig {

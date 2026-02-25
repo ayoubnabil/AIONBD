@@ -48,11 +48,25 @@ pub(crate) fn select_top_k(
         });
     }
 
-    normalize_target_recall(plan.mode, plan.target_recall)?;
     let options = VectorValidationOptions {
         strict_finite: collection.strict_finite(),
         zero_norm_epsilon: f32::EPSILON,
     };
+    if normalize_target_recall(plan.target_recall)?.is_some() {
+        return Ok(SearchSelection {
+            mode: SearchMode::Exact,
+            recall_at_k: Some(1.0),
+            hits: score_points(
+                collection,
+                plan.query,
+                plan.metric,
+                keep,
+                options,
+                plan.filter,
+                ScoreSource::All,
+            )?,
+        });
+    }
 
     match select_candidate_strategy(state, collection_name, collection, &plan, keep)? {
         CandidateStrategy::ExactScan => Ok(SearchSelection {
@@ -102,24 +116,16 @@ fn validate_search_inputs(collection: &Collection, plan: &SearchPlan<'_>) -> Res
     Ok(())
 }
 
-fn normalize_target_recall(
-    mode: SearchMode,
-    target_recall: Option<f32>,
-) -> Result<Option<f32>, ApiError> {
+fn normalize_target_recall(target_recall: Option<f32>) -> Result<Option<f32>, ApiError> {
     let Some(value) = target_recall else {
-        return Ok((mode == SearchMode::Exact).then_some(1.0));
+        return Ok(None);
     };
     if value <= 0.0 || value > 1.0 || !value.is_finite() {
         return Err(ApiError::invalid_argument(
             "target_recall must be within (0.0, 1.0]",
         ));
     }
-    if mode != SearchMode::Exact {
-        return Err(ApiError::invalid_argument(
-            "target_recall is only supported with mode 'exact'",
-        ));
-    }
-    Ok(Some(1.0))
+    Ok(Some(value))
 }
 
 #[derive(Debug)]
