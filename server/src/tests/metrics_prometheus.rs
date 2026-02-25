@@ -107,6 +107,9 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_audit_events_total "));
     assert!(payload.contains("aionbd_tenant_quota_collection_rejections_total 0"));
     assert!(payload.contains("aionbd_tenant_quota_point_rejections_total 0"));
+    assert!(payload.contains("aionbd_search_queries_total "));
+    assert!(payload.contains("aionbd_search_ivf_queries_total "));
+    assert!(payload.contains("aionbd_search_ivf_fallback_exact_total "));
     assert!(payload.contains("# TYPE aionbd_persistence_writes counter"));
 }
 
@@ -186,4 +189,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_auth_failures_total 3"));
     assert!(payload.contains("aionbd_rate_limit_rejections_total 4"));
     assert!(payload.contains("aionbd_audit_events_total 5"));
+    assert!(payload.contains("aionbd_search_queries_total "));
+    assert!(payload.contains("aionbd_search_ivf_queries_total "));
+    assert!(payload.contains("aionbd_search_ivf_fallback_exact_total "));
 }

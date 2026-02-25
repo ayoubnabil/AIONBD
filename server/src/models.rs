@@ -91,6 +91,9 @@ pub(crate) struct MetricsResponse {
     pub(crate) persistence_enabled: bool,
     pub(crate) persistence_writes: u64,
     pub(crate) persistence_checkpoint_degraded_total: u64,
+    pub(crate) search_queries_total: u64,
+    pub(crate) search_ivf_queries_total: u64,
+    pub(crate) search_ivf_fallback_exact_total: u64,
 }
 
 #[derive(Debug, Deserialize)]

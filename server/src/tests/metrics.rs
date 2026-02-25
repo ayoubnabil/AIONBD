@@ -111,6 +111,11 @@ async fn metrics_reports_collection_and_point_counts() {
     assert!(payload["audit_events_total"].as_u64().unwrap_or(0) >= 1);
     assert_eq!(payload["tenant_quota_collection_rejections_total"], 0);
     assert_eq!(payload["tenant_quota_point_rejections_total"], 0);
+    assert!(payload["search_queries_total"].as_u64().is_some());
+    assert!(payload["search_ivf_queries_total"].as_u64().is_some());
+    assert!(payload["search_ivf_fallback_exact_total"]
+        .as_u64()
+        .is_some());
     assert!(payload["uptime_ms"].as_u64().is_some());
 }
 
@@ -160,6 +165,18 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
         .audit_events_total
         .store(13, Ordering::Relaxed);
     state.metrics.persistence_writes.store(9, Ordering::Relaxed);
+    state
+        .metrics
+        .search_queries_total
+        .store(21, Ordering::Relaxed);
+    state
+        .metrics
+        .search_ivf_queries_total
+        .store(8, Ordering::Relaxed);
+    state
+        .metrics
+        .search_ivf_fallback_exact_total
+        .store(3, Ordering::Relaxed);
     let app = build_app(state);
 
     let metrics_req = Request::builder()
@@ -205,4 +222,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["rate_limit_rejections_total"], 12);
     assert_eq!(payload["audit_events_total"], 13);
     assert_eq!(payload["persistence_writes"], 9);
+    assert_eq!(payload["search_queries_total"], 21);
+    assert_eq!(payload["search_ivf_queries_total"], 8);
+    assert_eq!(payload["search_ivf_fallback_exact_total"], 3);
 }

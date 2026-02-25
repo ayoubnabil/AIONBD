@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use aionbd_core::{Collection, VectorValidationOptions};
 
 use crate::errors::ApiError;
@@ -34,6 +36,10 @@ pub(crate) fn select_top_k(
     plan: SearchPlan<'_>,
 ) -> Result<SearchSelection, ApiError> {
     validate_search_inputs(collection, &plan)?;
+    let _ = state
+        .metrics
+        .search_queries_total
+        .fetch_add(1, Ordering::Relaxed);
 
     if let Some(filter) = plan.filter {
         validate_filter(filter)?;
@@ -62,20 +68,32 @@ pub(crate) fn select_top_k(
         keep,
         target_recall,
     )? {
-        CandidateStrategy::ExactScan => Ok(SearchSelection {
-            mode: SearchMode::Exact,
-            recall_at_k: Some(1.0),
-            hits: score_points(
-                collection,
-                plan.query,
-                plan.metric,
-                keep,
-                options,
-                plan.filter,
-                ScoreSource::All,
-            )?,
-        }),
+        CandidateStrategy::ExactScan { ivf_fallback } => {
+            if ivf_fallback {
+                let _ = state
+                    .metrics
+                    .search_ivf_fallback_exact_total
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(SearchSelection {
+                mode: SearchMode::Exact,
+                recall_at_k: Some(1.0),
+                hits: score_points(
+                    collection,
+                    plan.query,
+                    plan.metric,
+                    keep,
+                    options,
+                    plan.filter,
+                    ScoreSource::All,
+                )?,
+            })
+        }
         CandidateStrategy::Ivf(candidate_ids) => {
+            let _ = state
+                .metrics
+                .search_ivf_queries_total
+                .fetch_add(1, Ordering::Relaxed);
             let approx_hits = score_points(
                 collection,
                 plan.query,
@@ -123,7 +141,7 @@ fn normalize_target_recall(target_recall: Option<f32>) -> Result<Option<f32>, Ap
 
 #[derive(Debug)]
 enum CandidateStrategy {
-    ExactScan,
+    ExactScan { ivf_fallback: bool },
     Ivf(Vec<u64>),
 }
 
@@ -136,10 +154,14 @@ fn select_candidate_strategy(
     target_recall: Option<f32>,
 ) -> Result<CandidateStrategy, ApiError> {
     match plan.mode {
-        SearchMode::Exact => Ok(CandidateStrategy::ExactScan),
+        SearchMode::Exact => Ok(CandidateStrategy::ExactScan {
+            ivf_fallback: false,
+        }),
         SearchMode::Ivf | SearchMode::Auto => {
             if !matches!(plan.metric, Metric::L2) && plan.mode == SearchMode::Auto {
-                return Ok(CandidateStrategy::ExactScan);
+                return Ok(CandidateStrategy::ExactScan {
+                    ivf_fallback: false,
+                });
             }
             if collection.len() < IvfIndex::min_indexed_points() {
                 if plan.mode == SearchMode::Ivf {
@@ -148,7 +170,9 @@ fn select_candidate_strategy(
                         IvfIndex::min_indexed_points()
                     )));
                 }
-                return Ok(CandidateStrategy::ExactScan);
+                return Ok(CandidateStrategy::ExactScan {
+                    ivf_fallback: false,
+                });
             }
 
             if let Some(index) = state
@@ -168,7 +192,9 @@ fn select_candidate_strategy(
 
             record_l2_lookup_miss(state);
             schedule_l2_build_if_needed(state, collection_name, collection);
-            Ok(CandidateStrategy::ExactScan)
+            Ok(CandidateStrategy::ExactScan {
+                ivf_fallback: matches!(plan.mode, SearchMode::Ivf),
+            })
         }
     }
 }
