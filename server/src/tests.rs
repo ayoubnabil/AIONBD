@@ -10,6 +10,7 @@ mod auth_isolation;
 mod auth_quotas;
 mod checkpointing;
 mod collection_deletion;
+mod engine_guard;
 mod filtering;
 mod http_metrics;
 mod index_cache;

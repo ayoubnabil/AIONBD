@@ -35,6 +35,7 @@ use tracing_subscriber::EnvFilter;
 
 mod auth;
 mod config;
+mod engine_guard;
 mod errors;
 mod handler_utils;
 mod handlers;
@@ -54,6 +55,7 @@ mod tests;
 
 use crate::auth::{auth_rate_limit_audit, AuthConfig};
 use crate::config::AppConfig;
+use crate::engine_guard::require_engine_loaded;
 use crate::errors::handle_middleware_error;
 use crate::handlers::{
     create_collection, delete_collection, distance, get_collection, list_collections, live, ready,
@@ -112,6 +114,7 @@ pub(crate) fn build_app(state: AppState) -> Router {
     let request_id_header = HeaderName::from_static("x-request-id");
     let http_metrics_layer = middleware::from_fn_with_state(state.clone(), track_http_metrics);
     let auth_layer = middleware::from_fn_with_state(state.clone(), auth_rate_limit_audit);
+    let engine_guard_layer = middleware::from_fn_with_state(state.clone(), require_engine_loaded);
     let config = state.config.clone();
     let timeout = Duration::from_millis(config.request_timeout_ms);
 
@@ -143,12 +146,7 @@ pub(crate) fn build_app(state: AppState) -> Router {
                 .on_response(DefaultOnResponse::new().latency_unit(LatencyUnit::Millis)),
         );
 
-    Router::new()
-        .route("/live", get(live))
-        .route("/ready", get(ready))
-        .route("/metrics", get(metrics))
-        .route("/metrics/prometheus", get(metrics_prometheus))
-        .route("/distance", post(distance))
+    let data_routes = Router::new()
         .route(
             "/collections",
             post(create_collection).get(list_collections),
@@ -167,6 +165,15 @@ pub(crate) fn build_app(state: AppState) -> Router {
             "/collections/:name/points/:id",
             put(upsert_point).get(get_point).delete(delete_point),
         )
+        .layer(engine_guard_layer);
+
+    Router::new()
+        .route("/live", get(live))
+        .route("/ready", get(ready))
+        .route("/metrics", get(metrics))
+        .route("/metrics/prometheus", get(metrics_prometheus))
+        .route("/distance", post(distance))
+        .merge(data_routes)
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         .layer(auth_layer)
         .layer(middleware)
