@@ -38,6 +38,7 @@ async fn persistence_survives_restart_via_snapshot_and_wal() {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -46,6 +47,7 @@ async fn persistence_survives_restart_via_snapshot_and_wal() {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: true,
+        wal_sync_on_write: true,
         snapshot_path: snapshot_path.clone(),
         wal_path: wal_path.clone(),
     };
@@ -106,6 +108,7 @@ async fn failed_persist_rolls_back_in_memory_mutation() {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -114,6 +117,7 @@ async fn failed_persist_rolls_back_in_memory_mutation() {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: true,
+        wal_sync_on_write: true,
         snapshot_path,
         wal_path,
     };
@@ -158,6 +162,7 @@ async fn wal_only_commit_succeeds_when_snapshot_checkpoint_fails() {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -166,6 +171,7 @@ async fn wal_only_commit_succeeds_when_snapshot_checkpoint_fails() {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: true,
+        wal_sync_on_write: true,
         snapshot_path,
         wal_path: wal_path.clone(),
     };
@@ -213,6 +219,7 @@ async fn deleted_collection_is_not_restored_after_reload() {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -221,6 +228,7 @@ async fn deleted_collection_is_not_restored_after_reload() {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: true,
+        wal_sync_on_write: true,
         snapshot_path: snapshot_path.clone(),
         wal_path: wal_path.clone(),
     };

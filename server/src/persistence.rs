@@ -24,7 +24,7 @@ pub(crate) async fn persist_change_if_enabled(
 
     let wal_path = state.config.wal_path.clone();
     let wal_record = record.clone();
-    let sync_on_write = true;
+    let sync_on_write = state.config.wal_sync_on_write;
     if let Err(error) = run_serialized_persistence_io(state, move || {
         append_wal_record_with_sync(&wal_path, &wal_record, sync_on_write)
     })

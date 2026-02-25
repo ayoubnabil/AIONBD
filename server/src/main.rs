@@ -89,6 +89,7 @@ async fn main() -> Result<()> {
     tracing::info!(
         %bind,
         max_dimension = config.max_dimension,
+        max_points_per_collection = config.max_points_per_collection,
         strict_finite = config.strict_finite,
         timeout_ms = config.request_timeout_ms,
         max_body_bytes = config.max_body_bytes,
@@ -97,6 +98,7 @@ async fn main() -> Result<()> {
         max_topk_limit = config.max_topk_limit,
         checkpoint_interval = config.checkpoint_interval,
         persistence_enabled = config.persistence_enabled,
+        wal_sync_on_write = config.wal_sync_on_write,
         snapshot_path = %config.snapshot_path.display(),
         wal_path = %config.wal_path.display(),
         "aionbd server started"

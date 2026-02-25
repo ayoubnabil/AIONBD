@@ -33,6 +33,15 @@ groups:
           summary: "AIONBD storage unavailable"
           description: "Persistence layer is reporting unavailable state."
 
+      - alert: AionbdWalSyncDisabled
+        expr: aionbd_persistence_enabled == 1 and aionbd_persistence_wal_sync_on_write == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL sync-on-write is disabled"
+          description: "Writes can be acknowledged before fsync; crash/power-loss durability is reduced."
+
       - alert: AionbdCheckpointDegraded
         expr: rate(aionbd_persistence_checkpoint_degraded_total[5m]) > 0
         for: 15m

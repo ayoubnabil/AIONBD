@@ -44,6 +44,7 @@ fn test_state(snapshot_path: PathBuf, wal_path: PathBuf) -> AppState {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -52,6 +53,7 @@ fn test_state(snapshot_path: PathBuf, wal_path: PathBuf) -> AppState {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: true,
+        wal_sync_on_write: true,
         snapshot_path,
         wal_path,
     };

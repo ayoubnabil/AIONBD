@@ -50,6 +50,8 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
   memory cost) to `bench/reports/`.
 - Point payload metadata is supported on upsert/get/search responses.
 - Persistence rotates WAL into incremental snapshots and compacts periodically to control restart cost.
+- Per-collection point capacity is configurable (`AIONBD_MAX_POINTS_PER_COLLECTION`, default `1000000`).
+- WAL durability mode is configurable (`AIONBD_WAL_SYNC_ON_WRITE`, default `true`).
 - Cached L2 IVF indexes are invalidated automatically on collection and point mutations.
 - `/metrics` exposes runtime counts including aggregate readiness, HTTP request counters
   (total/in-flight/2xx/4xx/5xx), and request latency aggregates

@@ -20,6 +20,7 @@ mod limits_locking;
 mod list_points;
 mod list_points_offset;
 mod metrics;
+mod metrics_backlog;
 mod metrics_prometheus;
 mod persistence;
 mod persistence_chaos;
@@ -35,6 +36,7 @@ fn test_state() -> AppState {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -43,6 +45,7 @@ fn test_state() -> AppState {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: false,
+        wal_sync_on_write: true,
         snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
         wal_path: std::path::PathBuf::from("unused_wal.jsonl"),
     };

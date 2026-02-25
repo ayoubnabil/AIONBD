@@ -98,6 +98,9 @@ aionbd_tenant_quota_point_rejections_total {}\n\
 # HELP aionbd_persistence_enabled Persistence mode flag (1 enabled, 0 disabled).\n\
 # TYPE aionbd_persistence_enabled gauge\n\
 aionbd_persistence_enabled {}\n\
+# HELP aionbd_persistence_wal_sync_on_write WAL fsync-on-write flag (1 enabled, 0 disabled).\n\
+# TYPE aionbd_persistence_wal_sync_on_write gauge\n\
+aionbd_persistence_wal_sync_on_write {}\n\
 # HELP aionbd_persistence_writes Successful persisted writes since startup.\n\
 # TYPE aionbd_persistence_writes counter\n\
 aionbd_persistence_writes {}\n\
@@ -130,7 +133,10 @@ aionbd_search_queries_total {}\n\
 aionbd_search_ivf_queries_total {}\n\
 # HELP aionbd_search_ivf_fallback_exact_total Total explicit IVF searches that fell back to exact scan.\n\
 # TYPE aionbd_search_ivf_fallback_exact_total counter\n\
-aionbd_search_ivf_fallback_exact_total {}\n",
+aionbd_search_ivf_fallback_exact_total {}\n\
+# HELP aionbd_max_points_per_collection Configured maximum number of points per collection.\n\
+# TYPE aionbd_max_points_per_collection gauge\n\
+aionbd_max_points_per_collection {}\n",
         metrics.uptime_ms,
         metrics.http_requests_total,
         metrics.http_requests_in_flight,
@@ -163,6 +169,7 @@ aionbd_search_ivf_fallback_exact_total {}\n",
         metrics.tenant_quota_collection_rejections_total,
         metrics.tenant_quota_point_rejections_total,
         bool_as_u8(metrics.persistence_enabled),
+        bool_as_u8(metrics.persistence_wal_sync_on_write),
         metrics.persistence_writes,
         metrics.persistence_checkpoint_degraded_total,
         metrics.persistence_checkpoint_success_total,
@@ -174,6 +181,7 @@ aionbd_search_ivf_fallback_exact_total {}\n",
         metrics.search_queries_total,
         metrics.search_ivf_queries_total,
         metrics.search_ivf_fallback_exact_total,
+        metrics.max_points_per_collection,
     )
 }
 

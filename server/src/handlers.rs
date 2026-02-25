@@ -26,8 +26,6 @@ use crate::write_path::{
     load_tenant_collection_handle, precheck_upsert, remove_collection,
 };
 
-const HARD_MAX_POINTS_PER_COLLECTION: usize = 1_000_000;
-
 pub(crate) async fn create_collection(
     State(state): State<AppState>,
     Extension(tenant): Extension<TenantContext>,
@@ -232,9 +230,10 @@ pub(crate) async fn upsert_point(
     let wal_payload = payload_values.clone();
     let precheck =
         precheck_upsert(handle.clone(), id, values.clone(), payload_values.clone()).await?;
-    if precheck.creating_point && precheck.point_count >= HARD_MAX_POINTS_PER_COLLECTION {
+    let max_points_per_collection = state.config.max_points_per_collection;
+    if precheck.creating_point && precheck.point_count >= max_points_per_collection {
         return Err(ApiError::resource_exhausted(format!(
-            "collection point limit exceeded ({HARD_MAX_POINTS_PER_COLLECTION})"
+            "collection point limit exceeded ({max_points_per_collection})"
         )));
     }
     if precheck.creating_point && state.auth_config.tenant_max_points > 0 {

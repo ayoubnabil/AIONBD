@@ -52,6 +52,7 @@ Create one dashboard with these panels:
    `rate(aionbd_persistence_writes[5m])`, `rate(aionbd_persistence_checkpoint_degraded_total[5m])`
    `rate(aionbd_persistence_checkpoint_success_total[5m])`
    `rate(aionbd_persistence_checkpoint_error_total[5m])`
+   `aionbd_persistence_wal_sync_on_write`
    `aionbd_persistence_wal_size_bytes`
    `aionbd_persistence_wal_tail_open`
    `aionbd_persistence_incremental_segments`
@@ -64,6 +65,7 @@ Create one dashboard with these panels:
    `rate(aionbd_rate_limit_rejections_total[5m])`
 9. Cardinality/load indicators:
    `aionbd_collections`, `aionbd_points`, `aionbd_l2_indexes`
+   `aionbd_max_points_per_collection`
    `aionbd_collection_write_lock_entries`
    `aionbd_tenant_rate_window_entries`
    `aionbd_tenant_quota_lock_entries`
@@ -111,6 +113,15 @@ groups:
         annotations:
           summary: "AIONBD persistence running in WAL-only degraded mode"
           description: "Checkpointing keeps degrading; investigate snapshot and disk health."
+
+      - alert: AionbdWalSyncDisabled
+        expr: aionbd_persistence_enabled == 1 and aionbd_persistence_wal_sync_on_write == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL sync-on-write is disabled"
+          description: "Writes can be acknowledged before fsync; crash/power-loss durability is reduced."
 
       - alert: AionbdCheckpointError
         expr: rate(aionbd_persistence_checkpoint_error_total[5m]) > 0
@@ -236,6 +247,11 @@ When `AionbdCheckpointDegraded` fires:
 2. Inspect snapshot path permissions and available disk.
 3. Trigger controlled restart only after confirming WAL/snapshot files are healthy.
 
+When `AionbdWalSyncDisabled` fires:
+1. Confirm this is an intentional throughput-over-durability choice.
+2. If not intentional, restore `AIONBD_WAL_SYNC_ON_WRITE=true`.
+3. Document acknowledged durability risk in incident/change notes.
+
 When `AionbdCheckpointError` fires:
 1. Inspect server logs around checkpoint worker failures.
 2. Correlate with runtime saturation and `aionbd_storage_available`.
@@ -274,5 +290,6 @@ When `AionbdIvfFallbackRatioHigh` fires:
 ## Notes
 
 - `AIONBD_AUTH_TENANT_MAX_COLLECTIONS` and `AIONBD_AUTH_TENANT_MAX_POINTS` use `0` as disabled.
+- `AIONBD_WAL_SYNC_ON_WRITE=false` trades crash durability for throughput; monitor and document that choice explicitly.
 - Quota rejections are expected if limits are intentionally strict; alerting should be warning-level first.
 - Keep alert routing simple at the start: pager only for `critical`, ticket/chat for `warning`.

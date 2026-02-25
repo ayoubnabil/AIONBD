@@ -36,6 +36,7 @@ async fn checkpoint_interval_truncates_wal_periodically() {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -44,6 +45,7 @@ async fn checkpoint_interval_truncates_wal_periodically() {
         max_topk_limit: 1_000,
         checkpoint_interval: 3,
         persistence_enabled: true,
+        wal_sync_on_write: true,
         snapshot_path,
         wal_path: wal_path.clone(),
     };

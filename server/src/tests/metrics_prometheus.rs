@@ -13,6 +13,7 @@ fn test_state() -> AppState {
     let config = AppConfig {
         bind: "127.0.0.1:0".parse().expect("socket addr must parse"),
         max_dimension: 8,
+        max_points_per_collection: 1_000_000,
         strict_finite: true,
         request_timeout_ms: 2_000,
         max_body_bytes: 1_048_576,
@@ -21,6 +22,7 @@ fn test_state() -> AppState {
         max_topk_limit: 1_000,
         checkpoint_interval: 1,
         persistence_enabled: false,
+        wal_sync_on_write: true,
         snapshot_path: std::path::PathBuf::from("unused_snapshot.json"),
         wal_path: std::path::PathBuf::from("unused_wal.jsonl"),
     };
@@ -101,6 +103,7 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_engine_loaded 1"));
     assert!(payload.contains("aionbd_storage_available 1"));
     assert!(payload.contains("aionbd_persistence_enabled 0"));
+    assert!(payload.contains("aionbd_persistence_wal_sync_on_write 1"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
@@ -114,6 +117,7 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_search_queries_total "));
     assert!(payload.contains("aionbd_search_ivf_queries_total "));
     assert!(payload.contains("aionbd_search_ivf_fallback_exact_total "));
+    assert!(payload.contains("aionbd_max_points_per_collection 1000000"));
     assert!(payload.contains("# TYPE aionbd_persistence_writes counter"));
 }
 
@@ -189,6 +193,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_ready 0"));
     assert!(payload.contains("aionbd_engine_loaded 0"));
     assert!(payload.contains("aionbd_storage_available 0"));
+    assert!(payload.contains("aionbd_persistence_wal_sync_on_write 1"));
     assert!(payload.contains("aionbd_persistence_writes 12"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
@@ -200,4 +205,5 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_search_queries_total "));
     assert!(payload.contains("aionbd_search_ivf_queries_total "));
     assert!(payload.contains("aionbd_search_ivf_fallback_exact_total "));
+    assert!(payload.contains("aionbd_max_points_per_collection 1000000"));
 }

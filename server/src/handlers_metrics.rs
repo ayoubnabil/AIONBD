@@ -146,6 +146,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .tenant_quota_point_rejections_total
             .load(Ordering::Relaxed),
         persistence_enabled: state.config.persistence_enabled,
+        persistence_wal_sync_on_write: state.config.wal_sync_on_write,
         persistence_writes: state.metrics.persistence_writes.load(Ordering::Relaxed),
         persistence_checkpoint_degraded_total: state
             .metrics
@@ -172,6 +173,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .metrics
             .search_ivf_fallback_exact_total
             .load(Ordering::Relaxed),
+        max_points_per_collection: state.config.max_points_per_collection,
     })
 }
 

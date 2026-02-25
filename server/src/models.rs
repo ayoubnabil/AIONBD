@@ -92,6 +92,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) tenant_quota_collection_rejections_total: u64,
     pub(crate) tenant_quota_point_rejections_total: u64,
     pub(crate) persistence_enabled: bool,
+    pub(crate) persistence_wal_sync_on_write: bool,
     pub(crate) persistence_writes: u64,
     pub(crate) persistence_checkpoint_degraded_total: u64,
     pub(crate) persistence_checkpoint_success_total: u64,
@@ -103,6 +104,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) search_queries_total: u64,
     pub(crate) search_ivf_queries_total: u64,
     pub(crate) search_ivf_fallback_exact_total: u64,
+    pub(crate) max_points_per_collection: usize,
 }
 
 #[derive(Debug, Deserialize)]

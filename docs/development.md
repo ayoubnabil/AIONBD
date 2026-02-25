@@ -82,6 +82,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 
 - `AIONBD_BIND` (default: `127.0.0.1:8080`)
 - `AIONBD_MAX_DIMENSION` (default: `4096`)
+- `AIONBD_MAX_POINTS_PER_COLLECTION` (default: `1000000`, must be `> 0`)
 - `AIONBD_STRICT_FINITE` (default: `true`)
 - `AIONBD_REQUEST_TIMEOUT_MS` (default: `2000`)
 - `AIONBD_MAX_BODY_BYTES` (default: `1048576`)
@@ -90,6 +91,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_MAX_TOPK_LIMIT` (default: `1000`)
 - `AIONBD_CHECKPOINT_INTERVAL` (default: `32`)
 - `AIONBD_PERSISTENCE_ENABLED` (default: `true`)
+- `AIONBD_WAL_SYNC_ON_WRITE` (default: `true`; set `false` only for throughput-over-durability tradeoff)
 - `AIONBD_SNAPSHOT_PATH` (default: `data/aionbd_snapshot.json`)
 - `AIONBD_WAL_PATH` (default: `data/aionbd_wal.jsonl`)
 - `AIONBD_AUTH_MODE` (default: `disabled`, values: `disabled|api_key|bearer_token|api_key_or_bearer_token|jwt|api_key_or_jwt`)
