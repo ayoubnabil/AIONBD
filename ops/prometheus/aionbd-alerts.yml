@@ -42,6 +42,15 @@ groups:
           summary: "AIONBD persistence running in WAL-only degraded mode"
           description: "Checkpointing keeps degrading; investigate disk and snapshot path health."
 
+      - alert: AionbdCheckpointError
+        expr: rate(aionbd_persistence_checkpoint_error_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint attempts are failing"
+          description: "Checkpoint worker reported internal errors; inspect persistence and runtime health."
+
       - alert: AionbdWalBacklogGrowing
         expr: |
           aionbd_persistence_enabled == 1

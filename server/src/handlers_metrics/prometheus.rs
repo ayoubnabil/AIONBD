@@ -95,6 +95,12 @@ aionbd_persistence_writes {}\n\
 # HELP aionbd_persistence_checkpoint_degraded_total Total checkpoints that fell back to WAL-only mode.\n\
 # TYPE aionbd_persistence_checkpoint_degraded_total counter\n\
 aionbd_persistence_checkpoint_degraded_total {}\n\
+# HELP aionbd_persistence_checkpoint_success_total Total successful checkpoints.\n\
+# TYPE aionbd_persistence_checkpoint_success_total counter\n\
+aionbd_persistence_checkpoint_success_total {}\n\
+# HELP aionbd_persistence_checkpoint_error_total Total checkpoint attempts that failed with an internal error.\n\
+# TYPE aionbd_persistence_checkpoint_error_total counter\n\
+aionbd_persistence_checkpoint_error_total {}\n\
 # HELP aionbd_persistence_wal_size_bytes Current WAL file size in bytes.\n\
 # TYPE aionbd_persistence_wal_size_bytes gauge\n\
 aionbd_persistence_wal_size_bytes {}\n\
@@ -144,6 +150,8 @@ aionbd_search_ivf_fallback_exact_total {}\n",
         bool_as_u8(metrics.persistence_enabled),
         metrics.persistence_writes,
         metrics.persistence_checkpoint_degraded_total,
+        metrics.persistence_checkpoint_success_total,
+        metrics.persistence_checkpoint_error_total,
         metrics.persistence_wal_size_bytes,
         metrics.persistence_incremental_segments,
         metrics.persistence_incremental_size_bytes,

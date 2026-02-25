@@ -143,6 +143,14 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .metrics
             .persistence_checkpoint_degraded_total
             .load(Ordering::Relaxed),
+        persistence_checkpoint_success_total: state
+            .metrics
+            .persistence_checkpoint_success_total
+            .load(Ordering::Relaxed),
+        persistence_checkpoint_error_total: state
+            .metrics
+            .persistence_checkpoint_error_total
+            .load(Ordering::Relaxed),
         persistence_wal_size_bytes,
         persistence_incremental_segments,
         persistence_incremental_size_bytes,

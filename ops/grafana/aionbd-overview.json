@@ -109,6 +109,16 @@
           "expr": "aionbd_persistence_incremental_size_bytes",
           "legendFormat": "incremental_bytes",
           "refId": "E"
+        },
+        {
+          "expr": "rate(aionbd_persistence_checkpoint_success_total[5m])",
+          "legendFormat": "checkpoint_success/s",
+          "refId": "F"
+        },
+        {
+          "expr": "rate(aionbd_persistence_checkpoint_error_total[5m])",
+          "legendFormat": "checkpoint_error/s",
+          "refId": "G"
         }
       ]
     },

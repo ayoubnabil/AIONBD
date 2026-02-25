@@ -50,6 +50,8 @@ Create one dashboard with these panels:
    `aionbd_ready`, `aionbd_engine_loaded`, `aionbd_storage_available`
 6. Persistence behavior:
    `rate(aionbd_persistence_writes[5m])`, `rate(aionbd_persistence_checkpoint_degraded_total[5m])`
+   `rate(aionbd_persistence_checkpoint_success_total[5m])`
+   `rate(aionbd_persistence_checkpoint_error_total[5m])`
    `aionbd_persistence_wal_size_bytes`
    `aionbd_persistence_incremental_segments`
    `aionbd_persistence_incremental_size_bytes`
@@ -105,6 +107,15 @@ groups:
         annotations:
           summary: "AIONBD persistence running in WAL-only degraded mode"
           description: "Checkpointing keeps degrading; investigate snapshot and disk health."
+
+      - alert: AionbdCheckpointError
+        expr: rate(aionbd_persistence_checkpoint_error_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint attempts are failing"
+          description: "Checkpoint worker reported internal errors; inspect persistence and runtime health."
 
       - alert: AionbdWalBacklogGrowing
         expr: |
@@ -190,6 +201,11 @@ When `AionbdCheckpointDegraded` fires:
 1. Confirm WAL write rate (`aionbd_persistence_writes`) and checkpoint degradation rate.
 2. Inspect snapshot path permissions and available disk.
 3. Trigger controlled restart only after confirming WAL/snapshot files are healthy.
+
+When `AionbdCheckpointError` fires:
+1. Inspect server logs around checkpoint worker failures.
+2. Correlate with runtime saturation and `aionbd_storage_available`.
+3. Treat sustained errors as a persistence incident and reduce write pressure.
 
 When `AionbdWalBacklogGrowing` or `AionbdIncrementalBacklogGrowing` fires:
 1. Check `aionbd_persistence_wal_size_bytes`, `aionbd_persistence_incremental_segments`, and `aionbd_persistence_incremental_size_bytes`.

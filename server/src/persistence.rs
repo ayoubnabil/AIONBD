@@ -63,6 +63,10 @@ pub(crate) async fn persist_change_if_enabled(
     {
         Ok(PersistOutcome::Checkpointed) => {
             state.storage_available.store(true, Ordering::Relaxed);
+            let _ = state
+                .metrics
+                .persistence_checkpoint_success_total
+                .fetch_add(1, Ordering::Relaxed);
             Ok(())
         }
         Ok(PersistOutcome::WalOnly { reason }) => {
@@ -76,6 +80,10 @@ pub(crate) async fn persist_change_if_enabled(
         }
         Err(error) => {
             state.storage_available.store(false, Ordering::Relaxed);
+            let _ = state
+                .metrics
+                .persistence_checkpoint_error_total
+                .fetch_add(1, Ordering::Relaxed);
             tracing::error!(%error, "failed to persist state");
             Err(ApiError::internal("failed to persist state"))
         }

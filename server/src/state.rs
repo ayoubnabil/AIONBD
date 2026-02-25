@@ -47,6 +47,8 @@ pub(crate) struct MetricsState {
     pub(crate) tenant_quota_point_rejections_total: AtomicU64,
     pub(crate) audit_events_total: AtomicU64,
     pub(crate) persistence_checkpoint_degraded_total: AtomicU64,
+    pub(crate) persistence_checkpoint_success_total: AtomicU64,
+    pub(crate) persistence_checkpoint_error_total: AtomicU64,
 }
 
 #[derive(Clone)]
