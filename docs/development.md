@@ -101,6 +101,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_AUTH_JWT_TENANT_CLAIM` (optional, default: `tenant`)
 - `AIONBD_AUTH_JWT_PRINCIPAL_CLAIM` (optional, default: `sub`)
 - `AIONBD_AUTH_RATE_LIMIT_PER_MINUTE` (default: `0`, disabled when `0`)
+- `AIONBD_AUTH_RATE_WINDOW_RETENTION_MINUTES` (default: `60`, must be `> 0`)
 - `AIONBD_AUTH_TENANT_MAX_COLLECTIONS` (default: `0`, disabled when `0`)
 - `AIONBD_AUTH_TENANT_MAX_POINTS` (default: `0`, disabled when `0`)
 

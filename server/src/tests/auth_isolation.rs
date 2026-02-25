@@ -34,6 +34,7 @@ fn auth_state() -> AppState {
         bearer_token_to_tenant: BTreeMap::new(),
         jwt: None,
         rate_limit_per_minute: 0,
+        rate_window_retention_minutes: 60,
         tenant_max_collections: 0,
         tenant_max_points: 0,
     };

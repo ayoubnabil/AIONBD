@@ -37,6 +37,7 @@ fn jwt_state() -> AppState {
         bearer_token_to_tenant: BTreeMap::new(),
         jwt: Some(JwtConfig::for_tests(TEST_JWT_SECRET)),
         rate_limit_per_minute: 0,
+        rate_window_retention_minutes: 60,
         tenant_max_collections: 0,
         tenant_max_points: 0,
     };

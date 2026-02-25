@@ -5,8 +5,6 @@ use crate::state::{AppState, TenantRateWindow};
 
 use super::TenantContext;
 
-const RATE_WINDOW_RETENTION_MINUTES: u64 = 60;
-
 pub(super) async fn enforce_rate_limit(
     state: &AppState,
     tenant: &TenantContext,
@@ -23,9 +21,8 @@ pub(super) async fn enforce_rate_limit(
         / 60;
 
     let mut windows = state.tenant_rate_windows.lock().await;
-    windows.retain(|_, window| {
-        now_minute.saturating_sub(window.minute) <= RATE_WINDOW_RETENTION_MINUTES
-    });
+    let retention = state.auth_config.rate_window_retention_minutes;
+    windows.retain(|_, window| now_minute.saturating_sub(window.minute) <= retention);
     let entry = windows
         .entry(tenant.tenant_key().to_string())
         .or_insert(TenantRateWindow {
