@@ -17,6 +17,7 @@ pub(crate) async fn acquire_tenant_quota_guard(
             .tenant_quota_locks
             .lock()
             .map_err(|_| ApiError::internal("tenant quota lock map poisoned"))?;
+        locks.retain(|key, lock| key == &tenant_key || Arc::strong_count(lock) > 1);
         Arc::clone(
             locks
                 .entry(tenant_key)

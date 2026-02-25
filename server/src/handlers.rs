@@ -66,6 +66,10 @@ pub(crate) async fn create_collection(
     if state.auth_config.tenant_max_collections > 0 {
         let tenant_collections = tenant_collection_count(&state, &tenant)?;
         if tenant_collections >= state.auth_config.tenant_max_collections as usize {
+            let _ = state
+                .metrics
+                .tenant_quota_collection_rejections_total
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Err(ApiError::resource_exhausted(format!(
                 "tenant collection limit exceeded ({})",
                 state.auth_config.tenant_max_collections
@@ -166,6 +170,7 @@ pub(crate) async fn delete_collection(
 ) -> Result<Json<DeleteCollectionResponse>, ApiError> {
     let response_name = canonical_collection_name(&name)?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
+    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
     let collection_guard = existing_collection_write_lock(&state, &name)?
         .acquire_owned()
         .await
@@ -240,6 +245,10 @@ pub(crate) async fn upsert_point(
     if creating_point && state.auth_config.tenant_max_points > 0 {
         let tenant_points = tenant_point_count(&state, &tenant)?;
         if tenant_points >= state.auth_config.tenant_max_points as usize {
+            let _ = state
+                .metrics
+                .tenant_quota_point_rejections_total
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Err(ApiError::resource_exhausted(format!(
                 "tenant point limit exceeded ({})",
                 state.auth_config.tenant_max_points

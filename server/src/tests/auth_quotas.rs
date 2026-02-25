@@ -89,6 +89,21 @@ async fn tenant_collection_quota_is_enforced() {
     assert_eq!(create_second.status(), StatusCode::TOO_MANY_REQUESTS);
     let create_second_json = super::json_body(create_second).await;
     assert_eq!(create_second_json["code"], "resource_exhausted");
+    let metrics_after_quota = app
+        .clone()
+        .oneshot(request_with_api_key("GET", "/metrics", "key-a", None))
+        .await
+        .expect("response expected");
+    assert_eq!(metrics_after_quota.status(), StatusCode::OK);
+    let metrics_after_quota_json = super::json_body(metrics_after_quota).await;
+    assert_eq!(
+        metrics_after_quota_json["tenant_quota_collection_rejections_total"],
+        1
+    );
+    assert_eq!(
+        metrics_after_quota_json["tenant_quota_point_rejections_total"],
+        0
+    );
 
     let create_other_tenant = app
         .oneshot(request_with_api_key(
@@ -167,6 +182,17 @@ async fn tenant_point_quota_is_enforced_across_collections() {
         .await
         .expect("response expected");
     assert_eq!(upsert_third.status(), StatusCode::TOO_MANY_REQUESTS);
+    let metrics_after_point_quota = app
+        .clone()
+        .oneshot(request_with_api_key("GET", "/metrics", "key-a", None))
+        .await
+        .expect("response expected");
+    assert_eq!(metrics_after_point_quota.status(), StatusCode::OK);
+    let metrics_after_point_quota_json = super::json_body(metrics_after_point_quota).await;
+    assert_eq!(
+        metrics_after_point_quota_json["tenant_quota_point_rejections_total"],
+        1
+    );
 
     let create_other_tenant = app
         .clone()

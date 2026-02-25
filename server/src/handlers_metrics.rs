@@ -97,6 +97,12 @@ aionbd_l2_index_build_failures {}\n\
 # HELP aionbd_l2_index_build_in_flight Number of currently running asynchronous L2 index builds.\n\
 # TYPE aionbd_l2_index_build_in_flight gauge\n\
 aionbd_l2_index_build_in_flight {}\n\
+# HELP aionbd_tenant_quota_collection_rejections_total Total collection write rejections due to tenant quota.\n\
+# TYPE aionbd_tenant_quota_collection_rejections_total counter\n\
+aionbd_tenant_quota_collection_rejections_total {}\n\
+# HELP aionbd_tenant_quota_point_rejections_total Total point write rejections due to tenant quota.\n\
+# TYPE aionbd_tenant_quota_point_rejections_total counter\n\
+aionbd_tenant_quota_point_rejections_total {}\n\
 # HELP aionbd_persistence_enabled Persistence mode flag (1 enabled, 0 disabled).\n\
 # TYPE aionbd_persistence_enabled gauge\n\
 aionbd_persistence_enabled {}\n\
@@ -129,6 +135,8 @@ aionbd_persistence_checkpoint_degraded_total {}\n",
         metrics.l2_index_build_successes,
         metrics.l2_index_build_failures,
         metrics.l2_index_build_in_flight,
+        metrics.tenant_quota_collection_rejections_total,
+        metrics.tenant_quota_point_rejections_total,
         bool_as_u8(metrics.persistence_enabled),
         metrics.persistence_writes,
         metrics.persistence_checkpoint_degraded_total,
@@ -219,6 +227,14 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .l2_index_build_failures
             .load(Ordering::Relaxed),
         l2_index_build_in_flight: l2_build_in_flight(state),
+        tenant_quota_collection_rejections_total: state
+            .metrics
+            .tenant_quota_collection_rejections_total
+            .load(Ordering::Relaxed),
+        tenant_quota_point_rejections_total: state
+            .metrics
+            .tenant_quota_point_rejections_total
+            .load(Ordering::Relaxed),
         persistence_enabled: state.config.persistence_enabled,
         persistence_writes: state.metrics.persistence_writes.load(Ordering::Relaxed),
         persistence_checkpoint_degraded_total: state

@@ -106,6 +106,8 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["l2_indexes"], 0);
     assert_eq!(payload["persistence_enabled"], false);
     assert_eq!(payload["persistence_writes"], 0);
+    assert_eq!(payload["tenant_quota_collection_rejections_total"], 0);
+    assert_eq!(payload["tenant_quota_point_rejections_total"], 0);
     assert!(payload["uptime_ms"].as_u64().is_some());
 }
 

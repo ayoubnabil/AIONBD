@@ -16,6 +16,7 @@ use crate::models::{
 };
 use crate::persistence::persist_change_if_enabled;
 use crate::state::AppState;
+use crate::tenant_quota::acquire_tenant_quota_guard;
 
 const MAX_OFFSET_SCAN: usize = 100_000;
 
@@ -129,6 +130,7 @@ pub(crate) async fn delete_point(
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<DeletePointResponse>, ApiError> {
     let name = scoped_collection_name(&state, &name, &tenant)?;
+    let _tenant_quota_guard = acquire_tenant_quota_guard(&state, &tenant).await?;
     let _collection_guard = existing_collection_write_lock(&state, &name)?
         .acquire_owned()
         .await

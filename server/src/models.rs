@@ -83,6 +83,8 @@ pub(crate) struct MetricsResponse {
     pub(crate) l2_index_build_successes: u64,
     pub(crate) l2_index_build_failures: u64,
     pub(crate) l2_index_build_in_flight: usize,
+    pub(crate) tenant_quota_collection_rejections_total: u64,
+    pub(crate) tenant_quota_point_rejections_total: u64,
     pub(crate) persistence_enabled: bool,
     pub(crate) persistence_writes: u64,
     pub(crate) persistence_checkpoint_degraded_total: u64,

@@ -102,6 +102,8 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_storage_available 1"));
     assert!(payload.contains("aionbd_persistence_enabled 0"));
     assert!(payload.contains("aionbd_persistence_writes 0"));
+    assert!(payload.contains("aionbd_tenant_quota_collection_rejections_total 0"));
+    assert!(payload.contains("aionbd_tenant_quota_point_rejections_total 0"));
     assert!(payload.contains("# TYPE aionbd_persistence_writes counter"));
 }
 

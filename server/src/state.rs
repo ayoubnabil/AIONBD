@@ -41,6 +41,8 @@ pub(crate) struct MetricsState {
     pub(crate) l2_index_build_failures: AtomicU64,
     pub(crate) auth_failures_total: AtomicU64,
     pub(crate) rate_limit_rejections_total: AtomicU64,
+    pub(crate) tenant_quota_collection_rejections_total: AtomicU64,
+    pub(crate) tenant_quota_point_rejections_total: AtomicU64,
     pub(crate) audit_events_total: AtomicU64,
     pub(crate) persistence_checkpoint_degraded_total: AtomicU64,
 }
