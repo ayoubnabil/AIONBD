@@ -203,7 +203,6 @@ async fn degraded_checkpoint_state_is_recovered_on_restart() {
         .expect("response expected");
     assert_eq!(ready.status(), StatusCode::SERVICE_UNAVAILABLE);
 
-    fs::remove_file(&blocking_incremental_dir).expect("blocking file should be removable");
     let restored = load_collections(&snapshot_path, &wal_path).expect("restore should succeed");
     let collection = restored
         .get("degraded")

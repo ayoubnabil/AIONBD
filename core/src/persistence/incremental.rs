@@ -163,6 +163,9 @@ fn list_incremental_snapshots(snapshot_path: &Path) -> Result<Vec<PathBuf>, Pers
     if !dir.exists() {
         return Ok(Vec::new());
     }
+    if !fs::metadata(&dir)?.is_dir() {
+        return Ok(Vec::new());
+    }
 
     let mut paths = Vec::new();
     for entry in fs::read_dir(dir)? {
