@@ -5,12 +5,13 @@ use tokio::task;
 
 use crate::auth::TenantContext;
 use crate::errors::{map_json_rejection, ApiError};
-use crate::handler_utils::collection_handle;
+use crate::handler_utils::scoped_collection_name;
 use crate::models::{
     Metric, SearchFilter, SearchMode, SearchRequest, SearchResponse, SearchTopKRequest,
     SearchTopKResponse, DEFAULT_TOPK_LIMIT,
 };
 use crate::state::{AppState, CollectionHandle};
+use crate::write_path::load_collection_handle;
 
 mod engine;
 mod filter;
@@ -24,7 +25,8 @@ pub(crate) async fn search_collection(
 ) -> Result<Json<SearchResponse>, ApiError> {
     let Json(payload) = payload.map_err(map_json_rejection)?;
     let metric = payload.metric;
-    let (name, handle) = collection_handle(&state, &name, &tenant)?;
+    let name = scoped_collection_name(&state, &name, &tenant)?;
+    let handle = load_collection_handle(state.clone(), name.clone()).await?;
     let selected = run_search(
         state.clone(),
         name,
@@ -77,7 +79,8 @@ pub(crate) async fn search_collection_top_k(
     }
     let limit = requested_limit.min(max_topk_limit);
 
-    let (name, handle) = collection_handle(&state, &name, &tenant)?;
+    let name = scoped_collection_name(&state, &name, &tenant)?;
+    let handle = load_collection_handle(state.clone(), name.clone()).await?;
     let selected = run_search(
         state.clone(),
         name,
