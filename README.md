@@ -52,6 +52,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - Persistence rotates WAL into incremental snapshots and compacts periodically to control restart cost.
 - Per-collection point capacity is configurable (`AIONBD_MAX_POINTS_PER_COLLECTION`, default `1000000`).
 - WAL durability mode is configurable (`AIONBD_WAL_SYNC_ON_WRITE`, default `true`).
+- IVF async rebuild cooldown is configurable (`AIONBD_L2_INDEX_BUILD_COOLDOWN_MS`, default `1000`).
 - Cached L2 IVF indexes are invalidated automatically on collection and point mutations.
 - `/metrics` exposes runtime counts including aggregate readiness, HTTP request counters
   (total/in-flight/2xx/4xx/5xx), and request latency aggregates

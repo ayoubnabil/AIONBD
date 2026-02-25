@@ -1,4 +1,5 @@
 use std::sync::atomic::Ordering;
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use aionbd_core::Collection;
@@ -6,7 +7,7 @@ use aionbd_core::Collection;
 use crate::ivf_index::IvfIndex;
 use crate::state::AppState;
 
-const L2_BUILD_COOLDOWN_MS: u64 = 1_000;
+const DEFAULT_L2_BUILD_COOLDOWN_MS: u64 = 1_000;
 
 pub(crate) fn record_l2_lookup_hit(state: &AppState) {
     let _ = state
@@ -57,6 +58,27 @@ pub(crate) fn clear_l2_build_tracking(state: &AppState, collection_name: &str) {
     if let Ok(mut started) = state.l2_index_last_started_ms.lock() {
         let _ = started.remove(collection_name);
     }
+}
+
+pub(crate) fn configured_l2_build_cooldown_ms() -> u64 {
+    static COOLDOWN_MS: OnceLock<u64> = OnceLock::new();
+    *COOLDOWN_MS.get_or_init(|| {
+        let Ok(raw) = std::env::var("AIONBD_L2_INDEX_BUILD_COOLDOWN_MS") else {
+            return DEFAULT_L2_BUILD_COOLDOWN_MS;
+        };
+        match raw.parse::<u64>() {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!(
+                    %raw,
+                    %error,
+                    default = DEFAULT_L2_BUILD_COOLDOWN_MS,
+                    "invalid AIONBD_L2_INDEX_BUILD_COOLDOWN_MS; using default"
+                );
+                DEFAULT_L2_BUILD_COOLDOWN_MS
+            }
+        }
+    })
 }
 
 pub(crate) fn schedule_l2_build_if_needed(
@@ -183,7 +205,8 @@ fn mark_l2_build_in_flight(state: &AppState, collection_name: &str) -> bool {
 }
 
 fn should_throttle_build(state: &AppState, collection_name: &str) -> bool {
-    if L2_BUILD_COOLDOWN_MS == 0 {
+    let cooldown_ms = configured_l2_build_cooldown_ms();
+    if cooldown_ms == 0 {
         return false;
     }
     let now_ms = now_millis();
@@ -192,7 +215,7 @@ fn should_throttle_build(state: &AppState, collection_name: &str) -> bool {
     };
     let throttled = started
         .get(collection_name)
-        .is_some_and(|last_ms| now_ms.saturating_sub(*last_ms) < L2_BUILD_COOLDOWN_MS);
+        .is_some_and(|last_ms| now_ms.saturating_sub(*last_ms) < cooldown_ms);
     if !throttled {
         started.insert(collection_name.to_string(), now_ms);
     }

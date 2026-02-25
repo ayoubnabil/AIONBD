@@ -9,7 +9,9 @@ use axum::Json;
 use tokio::task;
 
 use crate::errors::ApiError;
-use crate::index_manager::{l2_build_in_flight, l2_cache_hit_ratio};
+use crate::index_manager::{
+    configured_l2_build_cooldown_ms, l2_build_in_flight, l2_cache_hit_ratio,
+};
 use crate::models::MetricsResponse;
 use crate::state::AppState;
 
@@ -131,6 +133,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .metrics
             .l2_index_build_cooldown_skips
             .load(Ordering::Relaxed),
+        l2_index_build_cooldown_ms: configured_l2_build_cooldown_ms(),
         l2_index_build_in_flight: l2_build_in_flight(state),
         auth_failures_total: state.metrics.auth_failures_total.load(Ordering::Relaxed),
         rate_limit_rejections_total: state
