@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 
+use aionbd_core::WalRecord;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
@@ -115,6 +116,7 @@ async fn metrics_prometheus_reports_text_metrics() {
     assert!(payload.contains("aionbd_persistence_checkpoint_schedule_skips_total 0"));
     assert!(payload.contains("aionbd_persistence_wal_group_commits_total 0"));
     assert!(payload.contains("aionbd_persistence_wal_grouped_records_total 0"));
+    assert!(payload.contains("aionbd_persistence_wal_group_queue_depth 0"));
     assert!(payload.contains("aionbd_persistence_checkpoint_in_flight 0"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));
@@ -135,6 +137,12 @@ async fn metrics_prometheus_reports_text_metrics() {
 #[tokio::test]
 async fn metrics_prometheus_reflects_runtime_flags() {
     let mut state = test_state();
+    let (_is_leader, _rx) = state
+        .wal_group_queue
+        .enqueue(WalRecord::DeleteCollection {
+            name: "queued".to_string(),
+        })
+        .await;
     {
         let config = std::sync::Arc::make_mut(&mut state.config);
         config.wal_sync_on_write = false;
@@ -235,6 +243,7 @@ async fn metrics_prometheus_reflects_runtime_flags() {
     assert!(payload.contains("aionbd_persistence_checkpoint_schedule_skips_total 6"));
     assert!(payload.contains("aionbd_persistence_wal_group_commits_total 5"));
     assert!(payload.contains("aionbd_persistence_wal_grouped_records_total 23"));
+    assert!(payload.contains("aionbd_persistence_wal_group_queue_depth 1"));
     assert!(payload.contains("aionbd_persistence_checkpoint_in_flight 1"));
     assert!(payload.contains("aionbd_persistence_wal_size_bytes 0"));
     assert!(payload.contains("aionbd_persistence_wal_tail_open 0"));

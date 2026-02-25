@@ -149,6 +149,9 @@ aionbd_persistence_wal_group_commits_total {}\n\
 # HELP aionbd_persistence_wal_grouped_records_total Total WAL records processed by the group-commit writer.\n\
 # TYPE aionbd_persistence_wal_grouped_records_total counter\n\
 aionbd_persistence_wal_grouped_records_total {}\n\
+# HELP aionbd_persistence_wal_group_queue_depth Current number of pending WAL writes waiting in the group-commit queue.\n\
+# TYPE aionbd_persistence_wal_group_queue_depth gauge\n\
+aionbd_persistence_wal_group_queue_depth {}\n\
 # HELP aionbd_persistence_wal_size_bytes Current WAL file size in bytes.\n\
 # TYPE aionbd_persistence_wal_size_bytes gauge\n\
 aionbd_persistence_wal_size_bytes {}\n\
@@ -222,6 +225,7 @@ aionbd_max_points_per_collection {}\n",
         metrics.persistence_checkpoint_schedule_skips_total,
         metrics.persistence_wal_group_commits_total,
         metrics.persistence_wal_grouped_records_total,
+        metrics.persistence_wal_group_queue_depth,
         metrics.persistence_wal_size_bytes,
         bool_as_u8(metrics.persistence_wal_tail_open),
         metrics.persistence_incremental_segments,

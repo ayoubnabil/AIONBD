@@ -67,6 +67,10 @@ impl WalGroupQueue {
     pub(crate) async fn pending_len(&self) -> usize {
         self.state.lock().await.queue.len()
     }
+
+    pub(crate) fn pending_len_blocking(&self) -> usize {
+        self.state.blocking_lock().queue.len()
+    }
 }
 
 #[cfg(test)]

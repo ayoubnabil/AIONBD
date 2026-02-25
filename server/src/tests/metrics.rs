@@ -1,3 +1,4 @@
+use aionbd_core::WalRecord;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
@@ -118,6 +119,7 @@ async fn metrics_reports_collection_and_point_counts() {
     assert_eq!(payload["persistence_checkpoint_schedule_skips_total"], 0);
     assert_eq!(payload["persistence_wal_group_commits_total"], 0);
     assert_eq!(payload["persistence_wal_grouped_records_total"], 0);
+    assert_eq!(payload["persistence_wal_group_queue_depth"], 0);
     assert_eq!(payload["persistence_checkpoint_in_flight"], false);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);
@@ -140,6 +142,12 @@ async fn metrics_reports_collection_and_point_counts() {
 #[tokio::test]
 async fn metrics_reflect_runtime_flags_and_write_counter() {
     let state = test_state();
+    let (_is_leader, _rx) = state
+        .wal_group_queue
+        .enqueue(WalRecord::DeleteCollection {
+            name: "queued".to_string(),
+        })
+        .await;
     state.engine_loaded.store(false, Ordering::Relaxed);
     state.storage_available.store(false, Ordering::Relaxed);
     state
@@ -265,6 +273,7 @@ async fn metrics_reflect_runtime_flags_and_write_counter() {
     assert_eq!(payload["persistence_checkpoint_schedule_skips_total"], 4);
     assert_eq!(payload["persistence_wal_group_commits_total"], 3);
     assert_eq!(payload["persistence_wal_grouped_records_total"], 17);
+    assert_eq!(payload["persistence_wal_group_queue_depth"], 1);
     assert_eq!(payload["persistence_wal_size_bytes"], 0);
     assert_eq!(payload["persistence_wal_tail_open"], false);
     assert_eq!(payload["persistence_incremental_segments"], 0);

@@ -194,6 +194,7 @@ fn collect_metrics(state: &AppState) -> Result<MetricsResponse, ApiError> {
             .metrics
             .persistence_wal_grouped_records_total
             .load(Ordering::Relaxed),
+        persistence_wal_group_queue_depth: state.wal_group_queue.pending_len_blocking(),
         persistence_wal_size_bytes,
         persistence_wal_tail_open,
         persistence_incremental_segments,

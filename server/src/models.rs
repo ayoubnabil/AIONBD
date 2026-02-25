@@ -109,6 +109,7 @@ pub(crate) struct MetricsResponse {
     pub(crate) persistence_checkpoint_schedule_skips_total: u64,
     pub(crate) persistence_wal_group_commits_total: u64,
     pub(crate) persistence_wal_grouped_records_total: u64,
+    pub(crate) persistence_wal_group_queue_depth: usize,
     pub(crate) persistence_wal_size_bytes: u64,
     pub(crate) persistence_wal_tail_open: bool,
     pub(crate) persistence_incremental_segments: u64,
