@@ -36,6 +36,7 @@ mod handler_utils;
 mod handlers;
 mod handlers_points;
 mod handlers_search;
+mod ivf_index;
 mod models;
 mod persistence;
 mod state;

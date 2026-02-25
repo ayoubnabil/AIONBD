@@ -39,6 +39,7 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 - This step focuses on project structure and baseline quality.
 - Contribution flow is branch-first local with mandatory expert review before merge (`CONTRIBUTING.md`).
 - Persistence uses WAL per write and periodic snapshot checkpoints (`AIONBD_CHECKPOINT_INTERVAL`, default `32`).
+- Search uses an IVF candidate index for large L2 collections; dot/cosine currently remain exact linear scan.
 - Server endpoints:
   - `GET /live`
   - `GET /ready`

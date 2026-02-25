@@ -10,6 +10,7 @@ use std::collections::BinaryHeap;
 
 use crate::errors::{map_json_rejection, map_vector_error, ApiError};
 use crate::handler_utils::canonical_collection_name;
+use crate::ivf_index::IvfIndex;
 use crate::models::{
     Metric, SearchHit, SearchRequest, SearchResponse, SearchTopKRequest, SearchTopKResponse,
 };
@@ -32,7 +33,7 @@ pub(crate) async fn search_collection(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let best = select_top_k(collection, &payload.query, payload.metric, 1)?
+    let best = select_top_k(&state, &name, collection, &payload.query, payload.metric, 1)?
         .into_iter()
         .next()
         .ok_or_else(|| ApiError::invalid_argument("collection contains no points"))?;
@@ -65,7 +66,14 @@ pub(crate) async fn search_collection_top_k(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("collection '{name}' not found")))?;
 
-    let hits = select_top_k(collection, &payload.query, payload.metric, payload.limit)?;
+    let hits = select_top_k(
+        &state,
+        &name,
+        collection,
+        &payload.query,
+        payload.metric,
+        payload.limit,
+    )?;
 
     Ok(Json(SearchTopKResponse {
         metric: payload.metric,
@@ -74,6 +82,8 @@ pub(crate) async fn search_collection_top_k(
 }
 
 fn select_top_k(
+    state: &AppState,
+    collection_name: &str,
     collection: &Collection,
     query: &[f32],
     metric: Metric,
@@ -100,27 +110,31 @@ fn select_top_k(
 
     let keep = limit.min(collection.len());
     let mut heap = BinaryHeap::with_capacity(keep);
+    let candidate_ids =
+        select_candidate_ids(state, collection_name, collection, query, metric, keep);
 
-    for (id, values) in collection.iter_points() {
-        let value = score_point(metric, query, values, options)?;
-        let candidate = HeapCandidate { id, value, metric };
-
-        if heap.len() < keep {
-            heap.push(candidate);
-            continue;
-        }
-
-        let should_replace = heap.peek().is_some_and(|worst| {
-            compare_scores(
-                &(candidate.id, candidate.value),
-                &(worst.id, worst.value),
+    if let Some(candidate_ids) = candidate_ids.filter(|ids| ids.len() >= keep) {
+        for id in candidate_ids {
+            let values = collection
+                .get_point(id)
+                .ok_or_else(|| ApiError::internal("point id index is inconsistent"))?;
+            score_candidate(
+                &mut heap,
                 metric,
-            )
-            .is_lt()
-        });
-        if should_replace {
-            let _ = heap.pop();
-            heap.push(candidate);
+                keep,
+                id,
+                score_point(metric, query, values, options)?,
+            );
+        }
+    } else {
+        for (id, values) in collection.iter_points() {
+            score_candidate(
+                &mut heap,
+                metric,
+                keep,
+                id,
+                score_point(metric, query, values, options)?,
+            );
         }
     }
 
@@ -134,6 +148,61 @@ fn select_top_k(
         .into_iter()
         .map(|(id, value)| SearchHit { id, value })
         .collect())
+}
+
+fn score_candidate(
+    heap: &mut BinaryHeap<HeapCandidate>,
+    metric: Metric,
+    keep: usize,
+    id: u64,
+    value: f32,
+) {
+    let candidate = HeapCandidate { id, value, metric };
+    if heap.len() < keep {
+        heap.push(candidate);
+        return;
+    }
+
+    let should_replace = heap.peek().is_some_and(|worst| {
+        compare_scores(
+            &(candidate.id, candidate.value),
+            &(worst.id, worst.value),
+            metric,
+        )
+        .is_lt()
+    });
+    if should_replace {
+        let _ = heap.pop();
+        heap.push(candidate);
+    }
+}
+
+fn select_candidate_ids(
+    state: &AppState,
+    collection_name: &str,
+    collection: &Collection,
+    query: &[f32],
+    metric: Metric,
+    limit: usize,
+) -> Option<Vec<u64>> {
+    if !matches!(metric, Metric::L2) || collection.len() < IvfIndex::min_indexed_points() {
+        return None;
+    }
+
+    if let Ok(index_cache) = state.l2_indexes.read() {
+        if let Some(index) = index_cache.get(collection_name) {
+            if index.is_compatible(collection) {
+                return Some(index.candidate_ids(query, limit));
+            }
+        }
+    }
+
+    let index = IvfIndex::build(collection)?;
+    let candidate_ids = index.candidate_ids(query, limit);
+    if let Ok(mut index_cache) = state.l2_indexes.write() {
+        index_cache.insert(collection_name.to_string(), index);
+    }
+    Some(candidate_ids)
 }
 
 fn score_point(

@@ -7,6 +7,7 @@ use std::time::Instant;
 use aionbd_core::Collection;
 
 use crate::config::AppConfig;
+use crate::ivf_index::IvfIndex;
 
 pub(crate) struct AppState {
     pub(crate) started_at: Instant,
@@ -15,6 +16,7 @@ pub(crate) struct AppState {
     pub(crate) storage_available: Arc<AtomicBool>,
     pub(crate) persistence_writes: Arc<AtomicU64>,
     pub(crate) collections: Arc<RwLock<BTreeMap<String, Collection>>>,
+    pub(crate) l2_indexes: Arc<RwLock<BTreeMap<String, IvfIndex>>>,
 }
 
 impl Clone for AppState {
@@ -26,6 +28,7 @@ impl Clone for AppState {
             storage_available: Arc::clone(&self.storage_available),
             persistence_writes: Arc::clone(&self.persistence_writes),
             collections: Arc::clone(&self.collections),
+            l2_indexes: Arc::clone(&self.l2_indexes),
         }
     }
 }
@@ -42,6 +45,7 @@ impl AppState {
             storage_available: Arc::new(AtomicBool::new(true)),
             persistence_writes: Arc::new(AtomicU64::new(0)),
             collections: Arc::new(RwLock::new(collections)),
+            l2_indexes: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 }
