@@ -105,7 +105,7 @@ fn schedule_checkpoint_if_needed(state: &AppState) {
     });
 }
 
-fn configured_async_checkpoints() -> bool {
+pub(crate) fn configured_async_checkpoints() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
     *ENABLED.get_or_init(|| {
         let Ok(raw) = std::env::var("AIONBD_ASYNC_CHECKPOINTS") else {
@@ -121,6 +121,35 @@ fn configured_async_checkpoints() -> bool {
                     "invalid AIONBD_ASYNC_CHECKPOINTS; using default"
                 );
                 ASYNC_CHECKPOINTS_DEFAULT
+            }
+        }
+    })
+}
+
+pub(crate) fn configured_checkpoint_compact_after() -> usize {
+    static COMPACT_AFTER: OnceLock<usize> = OnceLock::new();
+    *COMPACT_AFTER.get_or_init(|| {
+        let Ok(raw) = std::env::var("AIONBD_CHECKPOINT_COMPACT_AFTER") else {
+            return CHECKPOINT_COMPACT_AFTER;
+        };
+        match raw.parse::<usize>() {
+            Ok(0) => {
+                tracing::warn!(
+                    %raw,
+                    default = CHECKPOINT_COMPACT_AFTER,
+                    "AIONBD_CHECKPOINT_COMPACT_AFTER must be > 0; using default"
+                );
+                CHECKPOINT_COMPACT_AFTER
+            }
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!(
+                    %raw,
+                    %error,
+                    default = CHECKPOINT_COMPACT_AFTER,
+                    "invalid AIONBD_CHECKPOINT_COMPACT_AFTER; using default"
+                );
+                CHECKPOINT_COMPACT_AFTER
             }
         }
     })
@@ -166,7 +195,7 @@ async fn run_checkpoint(state: AppState) {
     let snapshot_path = state.config.snapshot_path.clone();
     let wal_path = state.config.wal_path.clone();
     let checkpoint_policy = CheckpointPolicy {
-        incremental_compact_after: CHECKPOINT_COMPACT_AFTER,
+        incremental_compact_after: configured_checkpoint_compact_after(),
     };
     match run_serialized_persistence_io(&state, move || {
         checkpoint_wal_with_policy(&snapshot_path, &wal_path, checkpoint_policy)

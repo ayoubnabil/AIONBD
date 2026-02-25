@@ -113,6 +113,12 @@ aionbd_persistence_wal_sync_on_write {}\n\
 # HELP aionbd_persistence_wal_sync_every_n_writes Periodic WAL fsync cadence when sync-on-write is disabled (0 means never).\n\
 # TYPE aionbd_persistence_wal_sync_every_n_writes gauge\n\
 aionbd_persistence_wal_sync_every_n_writes {}\n\
+# HELP aionbd_persistence_async_checkpoints Persistence async checkpoint scheduling flag (1 enabled, 0 disabled).\n\
+# TYPE aionbd_persistence_async_checkpoints gauge\n\
+aionbd_persistence_async_checkpoints {}\n\
+# HELP aionbd_persistence_checkpoint_compact_after Incremental segment count threshold before snapshot compaction.\n\
+# TYPE aionbd_persistence_checkpoint_compact_after gauge\n\
+aionbd_persistence_checkpoint_compact_after {}\n\
 # HELP aionbd_persistence_writes Successful persisted writes since startup.\n\
 # TYPE aionbd_persistence_writes counter\n\
 aionbd_persistence_writes {}\n\
@@ -189,6 +195,8 @@ aionbd_max_points_per_collection {}\n",
         bool_as_u8(metrics.persistence_enabled),
         bool_as_u8(metrics.persistence_wal_sync_on_write),
         metrics.persistence_wal_sync_every_n_writes,
+        bool_as_u8(metrics.persistence_async_checkpoints),
+        metrics.persistence_checkpoint_compact_after,
         metrics.persistence_writes,
         bool_as_u8(metrics.persistence_checkpoint_in_flight),
         metrics.persistence_checkpoint_degraded_total,
