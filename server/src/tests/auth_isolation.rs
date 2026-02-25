@@ -32,6 +32,7 @@ fn auth_state() -> AppState {
             ("key-b".to_string(), "tenant_b".to_string()),
         ]),
         bearer_token_to_tenant: BTreeMap::new(),
+        jwt: None,
         rate_limit_per_minute: 0,
         tenant_max_collections: 0,
         tenant_max_points: 0,

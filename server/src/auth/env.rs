@@ -13,11 +13,12 @@ pub(super) fn parse_auth_mode(value: Option<&str>) -> Result<AuthMode> {
     {
         "disabled" => Ok(AuthMode::Disabled),
         "api_key" => Ok(AuthMode::ApiKey),
-        "bearer_token" | "jwt" => Ok(AuthMode::BearerToken),
-        "api_key_or_bearer_token" | "api_key_or_jwt" => Ok(AuthMode::ApiKeyOrBearerToken),
+        "bearer_token" => Ok(AuthMode::BearerToken),
+        "jwt" => Ok(AuthMode::Jwt),
+        "api_key_or_bearer_token" => Ok(AuthMode::ApiKeyOrBearerToken),
+        "api_key_or_jwt" => Ok(AuthMode::ApiKeyOrJwt),
         invalid => anyhow::bail!(
-            "AIONBD_AUTH_MODE must be one of disabled|api_key|bearer_token|api_key_or_bearer_token \
-(deprecated aliases: jwt|api_key_or_jwt), got '{invalid}'"
+            "AIONBD_AUTH_MODE must be one of disabled|api_key|bearer_token|api_key_or_bearer_token|jwt|api_key_or_jwt, got '{invalid}'"
         ),
     }
 }
@@ -56,4 +57,21 @@ pub(super) fn parse_u64(key: &str, default: u64) -> Result<u64> {
     let raw = std::env::var(key).unwrap_or_else(|_| default.to_string());
     raw.parse()
         .with_context(|| format!("{key} must be a non-negative integer"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_auth_mode_supports_jwt_variants() {
+        assert_eq!(
+            parse_auth_mode(Some("jwt")).expect("jwt mode should parse"),
+            AuthMode::Jwt
+        );
+        assert_eq!(
+            parse_auth_mode(Some("api_key_or_jwt")).expect("api_key_or_jwt mode should parse"),
+            AuthMode::ApiKeyOrJwt
+        );
+    }
 }
