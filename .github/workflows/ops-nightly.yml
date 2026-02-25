@@ -53,3 +53,27 @@ jobs:
             bench/reports/soak_pipeline_report.json
             bench/reports/chaos_pipeline_dryrun_report.md
             bench/reports/chaos_pipeline_dryrun_report.json
+
+  chaos-real:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run chaos pipeline (real tests)
+        env:
+          AIONBD_CHAOS_REPORT_PATH: "bench/reports/chaos_pipeline_report.md"
+          AIONBD_CHAOS_REPORT_JSON_PATH: "bench/reports/chaos_pipeline_report.json"
+        run: ./scripts/verify_chaos.sh
+      - name: Upload chaos real reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-chaos-real-reports
+          path: |
+            bench/reports/chaos_pipeline_report.md
+            bench/reports/chaos_pipeline_report.json
