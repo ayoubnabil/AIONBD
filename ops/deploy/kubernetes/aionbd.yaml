@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aionbd
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aionbd-config
+  namespace: aionbd
+data:
+  AIONBD_BIND: "0.0.0.0:8080"
+  AIONBD_PERSISTENCE_ENABLED: "true"
+  AIONBD_SNAPSHOT_PATH: "/var/lib/aionbd/snapshot.json"
+  AIONBD_WAL_PATH: "/var/lib/aionbd/wal.jsonl"
+  AIONBD_CHECKPOINT_INTERVAL: "32"
+  AIONBD_ASYNC_CHECKPOINTS: "true"
+  AIONBD_CHECKPOINT_COMPACT_AFTER: "64"
+  AIONBD_WAL_SYNC_ON_WRITE: "true"
+  AIONBD_WAL_SYNC_EVERY_N_WRITES: "0"
+  AIONBD_WAL_SYNC_INTERVAL_SECONDS: "0"
+  AIONBD_WAL_GROUP_COMMIT_MAX_BATCH: "16"
+  AIONBD_WAL_GROUP_COMMIT_FLUSH_DELAY_MS: "1"
+  AIONBD_MAX_DIMENSION: "4096"
+  AIONBD_MAX_POINTS_PER_COLLECTION: "1000000"
+  AIONBD_MEMORY_BUDGET_MB: "1024"
+  AIONBD_MAX_BODY_BYTES: "1048576"
+  AIONBD_MAX_CONCURRENCY: "256"
+  AIONBD_REQUEST_TIMEOUT_MS: "2000"
+  AIONBD_MAX_PAGE_LIMIT: "1000"
+  AIONBD_MAX_TOPK_LIMIT: "1000"
+  AIONBD_UPSERT_BATCH_MAX_POINTS: "256"
+  AIONBD_SEARCH_BATCH_MAX_QUERIES: "256"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: aionbd
+  namespace: aionbd
+spec:
+  serviceName: aionbd
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aionbd
+  template:
+    metadata:
+      labels:
+        app: aionbd
+    spec:
+      containers:
+        - name: aionbd
+          image: ghcr.io/aionbd/aionbd-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: aionbd-config
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/aionbd
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      securityContext:
+        fsGroup: 1000
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aionbd
+  namespace: aionbd
+spec:
+  selector:
+    app: aionbd
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http

@@ -1,0 +1,16 @@
+services:
+  aionbd:
+    image: aionbd-server:mvp
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.mvp
+    volumes:
+      - aionbd_data:/var/lib/aionbd
+
+volumes:
+  aionbd_data:

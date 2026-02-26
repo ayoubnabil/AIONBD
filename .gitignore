@@ -1,0 +1,29 @@
+# Local planning document (not tracked in git).
+ROADMAP_EDGEVECTOR.md
+
+# Rust build outputs.
+target/
+*.rs.bk
+
+# Python artifacts.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local runtime data.
+data/
+bench/reports/
+bench/tmp/
+dist/
+.env
+ops/deploy/.env.prod
+
+# Node artifacts.
+node_modules/
+
+# Editor and OS files.
+.DS_Store
+.idea/
+.vscode/

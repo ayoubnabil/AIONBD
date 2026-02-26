@@ -1,0 +1,217 @@
+groups:
+  - name: aionbd-alerts
+    rules:
+      - alert: AionbdNotReady
+        expr: aionbd_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIONBD is not ready"
+          description: "Readiness stayed down for more than 2 minutes."
+
+      - alert: AionbdHigh5xxRatio
+        expr: |
+          (
+            rate(aionbd_http_responses_total{status="5xx"}[5m])
+            /
+            clamp_min(rate(aionbd_http_requests_total[5m]), 1)
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIONBD 5xx ratio above 1%"
+          description: "Server error ratio stayed above target over 10 minutes."
+
+      - alert: AionbdStorageUnavailable
+        expr: aionbd_storage_available == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIONBD storage unavailable"
+          description: "Persistence layer is reporting unavailable state."
+
+      - alert: AionbdWalSyncDisabled
+        expr: aionbd_persistence_enabled == 1 and aionbd_persistence_wal_sync_on_write == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL sync-on-write is disabled"
+          description: "Writes can be acknowledged before fsync; crash/power-loss durability is reduced."
+
+      - alert: AionbdCheckpointDegraded
+        expr: rate(aionbd_persistence_checkpoint_degraded_total[5m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD persistence running in WAL-only degraded mode"
+          description: "Checkpointing keeps degrading; investigate disk and snapshot path health."
+
+      - alert: AionbdCheckpointError
+        expr: rate(aionbd_persistence_checkpoint_error_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint attempts are failing"
+          description: "Checkpoint worker reported internal errors; inspect persistence and runtime health."
+
+      - alert: AionbdWalTailOpen
+        expr: aionbd_persistence_enabled == 1 and aionbd_persistence_wal_tail_open == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL tail looks truncated"
+          description: "WAL file does not end with a newline for a sustained period; inspect storage health and restart behavior."
+
+      - alert: AionbdWalBacklogGrowing
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_wal_size_bytes > 268435456
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL backlog is growing"
+          description: "WAL size stayed above 256 MiB; checkpoint throughput may be insufficient."
+
+      - alert: AionbdIncrementalBacklogGrowing
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          (
+            aionbd_persistence_incremental_segments > 64
+            or
+            aionbd_persistence_incremental_size_bytes > 1073741824
+          )
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD incremental snapshot backlog is growing"
+          description: "Incremental snapshot backlog stayed high; compaction may be lagging."
+
+      - alert: AionbdIndexBuildFailing
+        expr: rate(aionbd_l2_index_build_failures[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD IVF index builds are failing"
+          description: "Asynchronous L2 index build failures detected."
+
+      - alert: AionbdIndexBuildCooldownSkipsHigh
+        expr: rate(aionbd_l2_index_build_cooldown_skips[10m]) > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD IVF index rebuild cooldown skips are high"
+          description: "Frequent cooldown skips indicate index churn under mutation-heavy load."
+
+      - alert: AionbdAuthFailures
+        expr: rate(aionbd_auth_failures_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD authentication failures observed"
+          description: "Invalid credentials or missing auth headers are being rejected."
+
+      - alert: AionbdRateLimitPressure
+        expr: rate(aionbd_rate_limit_rejections_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD request rate limiting active"
+          description: "Tenant request traffic exceeds configured rate limits."
+
+      - alert: AionbdTenantQuotaPressure
+        expr: |
+          rate(aionbd_tenant_quota_collection_rejections_total[10m]) > 0
+          or
+          rate(aionbd_tenant_quota_point_rejections_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD tenant quota pressure"
+          description: "Writes are being rejected by tenant collection/point quotas."
+
+      - alert: AionbdTenantTrackingCardinalityHigh
+        expr: |
+          aionbd_tenant_rate_window_entries > 10000
+          or
+          aionbd_tenant_quota_lock_entries > 10000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD tenant tracking cardinality is high"
+          description: "Tenant tracking maps grew beyond expected bounds; inspect abusive traffic and retention behavior."
+
+      - alert: AionbdCollectionWriteLocksCardinalityHigh
+        expr: aionbd_collection_write_lock_entries > 10000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD collection write lock cardinality is high"
+          description: "Collection write lock entries stayed high; inspect stale lock cleanup and collection churn patterns."
+
+      - alert: AionbdIvfFallbackRatioHigh
+        expr: |
+          (
+            rate(aionbd_search_ivf_fallback_exact_total[10m])
+            /
+            clamp_min(rate(aionbd_search_ivf_queries_total[10m]), 1)
+          ) > 0.25
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD explicit IVF requests are frequently falling back to exact"
+          description: "Fallback ratio stayed above 25%; index cache/build policy may be under-provisioned."
+
+      - alert: AionbdWalGroupQueueDepthHigh
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_wal_group_queue_depth > 1024
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD WAL group-commit queue depth is high"
+          description: "Pending WAL queue stayed above 1024 writes; write latency/backpressure risk is increasing."
+
+      - alert: AionbdCheckpointSchedulerSaturated
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          rate(aionbd_persistence_checkpoint_schedule_skips_total[10m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint scheduler is saturated"
+          description: "Due checkpoints are repeatedly skipped because a checkpoint is already in flight."
+
+      - alert: AionbdCheckpointInFlightStuck
+        expr: |
+          aionbd_persistence_enabled == 1
+          and
+          aionbd_persistence_checkpoint_in_flight == 1
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIONBD checkpoint appears stuck in-flight"
+          description: "Checkpoint remained in-flight for over 20 minutes; inspect persistence throughput and disk health."
