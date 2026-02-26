@@ -36,6 +36,19 @@ def run(script_path: Path, args: list[str], expect_ok: bool) -> None:
         )
 
 
+def ensure_within_root(
+    path: Path, *, root: Path, label: str, must_exist: bool = False
+) -> Path:
+    """Ensure path remains inside the trusted temporary root."""
+    resolved = path.resolve()
+    root_resolved = root.resolve()
+    if resolved != root_resolved and root_resolved not in resolved.parents:
+        raise ValueError(f"{label} must stay under {root_resolved}: {resolved}")
+    if must_exist and not resolved.exists():
+        raise FileNotFoundError(f"{label} does not exist: {resolved}")
+    return resolved
+
+
 def main() -> int:
     script_path = resolve_io_path(str(SCRIPT), label="script path", must_exist=True)
     profiles_path = resolve_io_path(
@@ -52,12 +65,16 @@ def main() -> int:
     with tempfile.TemporaryDirectory(
         prefix="aionbd_refresh_baseline_smoke_"
     ) as temp_dir:
-        root = Path(temp_dir)
-        soak_path = resolve_io_path(
-            str(root / "soak_baseline.json"), label="soak baseline path"
+        root = Path(temp_dir).resolve()
+        soak_path = ensure_within_root(
+            root / "soak_baseline.json",
+            root=root,
+            label="soak baseline path",
         )
-        chaos_path = resolve_io_path(
-            str(root / "chaos_baseline.json"), label="chaos baseline path"
+        chaos_path = ensure_within_root(
+            root / "chaos_baseline.json",
+            root=root,
+            label="chaos baseline path",
         )
 
         run(
@@ -90,11 +107,16 @@ def main() -> int:
             expect_ok=True,
         )
 
-        mutated = json.loads(soak_path.read_text(encoding="utf-8"))
+        trusted_soak_path = ensure_within_root(
+            soak_path, root=root, label="soak baseline path", must_exist=True
+        )
+        mutated = json.loads(trusted_soak_path.read_text(encoding="utf-8"))
         rows = mutated.get("rows", [])
         if isinstance(rows, list) and rows:
             rows[0]["throughput_ops_per_second"] = 0.0
-            soak_path.write_text(json.dumps(mutated, indent=2) + "\n", encoding="utf-8")
+            trusted_soak_path.write_text(
+                json.dumps(mutated, indent=2) + "\n", encoding="utf-8"
+            )
 
         run(
             script_path,

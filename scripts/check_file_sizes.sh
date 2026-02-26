@@ -31,15 +31,17 @@ mapfile -t offenders < <(
             continue
           fi
           line_count=$(wc -l < "$file")
-          if [ "$line_count" -gt "$MAX_LINES" ]; then
+          if [[ "$line_count" -gt "$MAX_LINES" ]]; then
             printf '%s (%s lines)\n' "$file" "$line_count"
           fi
+          ;;
+        *)
           ;;
       esac
     done
 )
 
-if [ "${#offenders[@]}" -gt 0 ]; then
+if [[ "${#offenders[@]}" -gt 0 ]]; then
   echo "ERROR: Files must stay under ${MAX_LINES} lines unless explicitly allowlisted."
   echo "To allow a legacy oversized file, add its relative path to ${ALLOWLIST_PATH}."
   printf '%s\n' "${offenders[@]}"

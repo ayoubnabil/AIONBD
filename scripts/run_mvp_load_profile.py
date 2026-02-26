@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,24 @@ REQUIRED_FIELDS = (
     "write_ops",
 )
 SOAK_STRICT_MAX_ERROR_RATE = 1.0
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def ensure_trusted_io_path(path: Path, *, label: str, must_exist: bool = False) -> Path:
+    """Re-validate path close to sink operations for static and runtime safety."""
+    resolved = path.resolve()
+    workspace_root = Path.cwd().resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    if not (_is_within(resolved, workspace_root) or _is_within(resolved, temp_root)):
+        raise ValueError(
+            f"{label} must stay under '{workspace_root}' or '{temp_root}': {resolved}"
+        )
+    if must_exist and not resolved.exists():
+        raise FileNotFoundError(f"{label} does not exist: {resolved}")
+    return resolved
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,6 +145,7 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def run_soak_profile(args: argparse.Namespace, raw_report_path: Path) -> dict[str, Any]:
+    raw_report_path = ensure_trusted_io_path(raw_report_path, label="raw-report-path")
     raw_report_path.parent.mkdir(parents=True, exist_ok=True)
     if raw_report_path.exists():
         raw_report_path.unlink()
@@ -193,7 +213,11 @@ def run_soak_profile(args: argparse.Namespace, raw_report_path: Path) -> dict[st
     if completed.returncode != 0:
         raise RuntimeError("mvp load soak run failed")
 
-    payload = json.loads(raw_report_path.read_text(encoding="utf-8"))
+    payload = json.loads(
+        ensure_trusted_io_path(
+            raw_report_path, label="raw-report-path", must_exist=True
+        ).read_text(encoding="utf-8")
+    )
     for field in REQUIRED_FIELDS:
         if field not in payload:
             raise RuntimeError(f"missing required field in soak report: {field}")
@@ -279,9 +303,18 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    raw_report_path = resolve_io_path(args.raw_report_path, label="raw-report-path")
-    report_md_path = resolve_io_path(args.report_path, label="report-path")
-    report_json_path = resolve_io_path(args.report_json_path, label="report-json-path")
+    raw_report_path = ensure_trusted_io_path(
+        resolve_io_path(args.raw_report_path, label="raw-report-path"),
+        label="raw-report-path",
+    )
+    report_md_path = ensure_trusted_io_path(
+        resolve_io_path(args.report_path, label="report-path"),
+        label="report-path",
+    )
+    report_json_path = ensure_trusted_io_path(
+        resolve_io_path(args.report_json_path, label="report-json-path"),
+        label="report-json-path",
+    )
 
     payload = run_soak_profile(args, raw_report_path)
     failures = evaluate(args, payload)
@@ -316,11 +349,11 @@ def main() -> int:
         "failures": failures,
     }
 
-    report_md_path.write_text(
+    ensure_trusted_io_path(report_md_path, label="report-path").write_text(
         markdown_report(generated_at, args, payload, failures),
         encoding="utf-8",
     )
-    report_json_path.write_text(
+    ensure_trusted_io_path(report_json_path, label="report-json-path").write_text(
         json.dumps(report_payload, indent=2) + "\n", encoding="utf-8"
     )
 

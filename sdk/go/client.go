@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+const pointPathFormat = "/collections/%s/points/%d"
+
 type Error struct {
 	Status int
 	Method string
@@ -174,7 +176,7 @@ func (c *Client) UpsertPoint(ctx context.Context, collection string, pointID uin
 	if payload != nil {
 		body["payload"] = payload
 	}
-	path := fmt.Sprintf("/collections/%s/points/%d", url.PathEscape(strings.TrimSpace(collection)), pointID)
+	path := fmt.Sprintf(pointPathFormat, url.PathEscape(strings.TrimSpace(collection)), pointID)
 	var response UpsertPointResponse
 	err := c.requestJSON(ctx, http.MethodPut, path, body, &response)
 	return response, err
@@ -189,7 +191,7 @@ func (c *Client) UpsertPointsBatch(ctx context.Context, collection string, point
 }
 
 func (c *Client) GetPoint(ctx context.Context, collection string, pointID uint64) (PointResponse, error) {
-	path := fmt.Sprintf("/collections/%s/points/%d", url.PathEscape(strings.TrimSpace(collection)), pointID)
+	path := fmt.Sprintf(pointPathFormat, url.PathEscape(strings.TrimSpace(collection)), pointID)
 	var response PointResponse
 	err := c.requestJSON(ctx, http.MethodGet, path, nil, &response)
 	return response, err
@@ -236,7 +238,7 @@ func (c *Client) ListPoints(ctx context.Context, collection string, options *Lis
 }
 
 func (c *Client) DeletePoint(ctx context.Context, collection string, pointID uint64) (DeletePointResponse, error) {
-	path := fmt.Sprintf("/collections/%s/points/%d", url.PathEscape(strings.TrimSpace(collection)), pointID)
+	path := fmt.Sprintf(pointPathFormat, url.PathEscape(strings.TrimSpace(collection)), pointID)
 	var response DeletePointResponse
 	err := c.requestJSON(ctx, http.MethodDelete, path, nil, &response)
 	return response, err
