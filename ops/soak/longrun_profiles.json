@@ -1,0 +1,34 @@
+[
+  {
+    "name": "read_heavy_24h",
+    "duration_seconds": 86400,
+    "workers": 8,
+    "write_ratio": 0.1,
+    "metric": "l2",
+    "search_mode": "auto",
+    "search_limit": 10,
+    "point_space": 1000000,
+    "dimension": 256,
+    "timeout_seconds": 5.0,
+    "strict_max_error_rate": 0.01,
+    "min_throughput_ops_per_second": 100.0,
+    "max_latency_us_p95": 50000,
+    "max_latency_us_p99": 100000
+  },
+  {
+    "name": "mixed_72h",
+    "duration_seconds": 259200,
+    "workers": 8,
+    "write_ratio": 0.3,
+    "metric": "l2",
+    "search_mode": "auto",
+    "search_limit": 10,
+    "point_space": 1000000,
+    "dimension": 256,
+    "timeout_seconds": 5.0,
+    "strict_max_error_rate": 0.02,
+    "min_throughput_ops_per_second": 80.0,
+    "max_latency_us_p95": 80000,
+    "max_latency_us_p99": 150000
+  }
+]

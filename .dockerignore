@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+target
+**/target
+.env
+*.log
+*.tmp
+data
+bench/reports
+sdk/python/.venv

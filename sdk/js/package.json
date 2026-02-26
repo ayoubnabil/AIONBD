@@ -1,0 +1,38 @@
+{
+  "name": "@aionbd/sdk-js",
+  "version": "0.2.0",
+  "description": "JavaScript SDK for AIONBD",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/client.unit.test.js test/client.integration.test.js",
+    "test:unit": "node --test test/client.unit.test.js",
+    "test:integration": "node --test test/client.integration.test.js",
+    "release:check": "npm test && npm pack --dry-run",
+    "publish:dry-run": "npm publish --dry-run --access public",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "aionbd",
+    "vector-database",
+    "edge-ai",
+    "sdk"
+  ],
+  "license": "UNLICENSED"
+}

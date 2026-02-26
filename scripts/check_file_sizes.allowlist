@@ -1,0 +1,25 @@
+# Legacy oversized files tracked for gradual refactors.
+# Keep this list minimal; new entries should be exceptional and justified.
+scripts/run_mvp_load_profile.py
+scripts/run_ann_open_bench_wrapper.py
+README.md
+bench/src/core_scan_bench.rs
+server/src/persistence.rs
+server/src/handlers.rs
+server/src/ivf_index.rs
+server/src/handlers_search/engine_batch.rs
+server/src/handlers_search/engine_batch_exact_transposed.rs
+server/src/prometheus_exporter.rs
+server/src/config.rs
+docs/development.md
+server/src/tests/limits.rs
+server/src/handlers_search/scoring.rs
+server/src/handlers_search.rs
+server/src/models.rs
+server/src/tests/search.rs
+server/src/tests/search_advanced.rs
+server/src/main.rs
+core/src/collection.rs
+core/src/vector.rs
+core/src/persistence/wal.rs
+core/src/persistence/tests.rs

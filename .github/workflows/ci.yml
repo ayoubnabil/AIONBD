@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  verify-local:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: File size guard
+        run: ./scripts/check_file_sizes.sh
+      - name: MVP load profile dry-run gate
+        run: ./scripts/verify_mvp_load_profile.sh
+      - name: Unified verification
+        run: ./scripts/verify_local.sh
+      - name: Chaos persistence verification
+        run: ./scripts/verify_chaos.sh
+      - name: Chaos dry-run baseline regression check
+        env:
+          AIONBD_CHAOS_DRY_RUN: "1"
+          AIONBD_CHAOS_REPORT_PATH: "bench/reports/chaos_pipeline_dryrun_report.md"
+          AIONBD_CHAOS_REPORT_JSON_PATH: "bench/reports/chaos_pipeline_dryrun_report.json"
+        run: |
+          ./scripts/verify_chaos.sh
+          python3 scripts/compare_report_regressions.py \
+            --kind chaos \
+            --baseline ops/baselines/chaos_pipeline_dryrun_baseline.json \
+            --current bench/reports/chaos_pipeline_dryrun_report.json
+      - name: Upload chaos pipeline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-pipeline-report
+          path: |
+            bench/reports/chaos_pipeline_report.md
+            bench/reports/chaos_pipeline_report.json
+            bench/reports/chaos_pipeline_dryrun_report.md
+            bench/reports/chaos_pipeline_dryrun_report.json
+
+  mvp-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build MVP container image
+        run: docker build -t aionbd-server:mvp .
+      - name: Validate compose configuration
+        run: |
+          cp ops/deploy/.env.mvp.example ops/deploy/.env.mvp
+          docker compose -f ops/deploy/docker-compose.mvp.yml --env-file ops/deploy/.env.mvp config >/dev/null
+
+  bench-pipelines:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Search quality + persistence benchmark pipelines
+        env:
+          AIONBD_BENCH_MIN_RECALL_IVF: "0.90"
+          AIONBD_BENCH_MIN_RECALL_AUTO: "0.90"
+          AIONBD_BENCH_MAX_P95_RATIO_IVF: "1.00"
+          AIONBD_BENCH_MAX_P95_RATIO_AUTO: "1.00"
+          AIONBD_BENCH_MAX_MEMORY_RATIO_IVF: "1.50"
+          AIONBD_BENCH_MAX_MEMORY_RATIO_AUTO: "1.50"
+        run: ./scripts/verify_bench.sh
+      - name: Upload benchmark reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: |
+            bench/reports/search_quality_report.md
+            bench/reports/search_quality_report.json
+            bench/reports/persistence_write_report.md
+            bench/reports/persistence_write_report.json
+
+  soak-pipeline-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Soak pipeline dry-run
+        env:
+          AIONBD_SOAK_DRY_RUN: "1"
+          AIONBD_SOAK_REPORT_PATH: "bench/reports/soak_pipeline_report.md"
+          AIONBD_SOAK_REPORT_JSON_PATH: "bench/reports/soak_pipeline_report.json"
+        run: ./scripts/verify_soak.sh --profiles-file ops/soak/longrun_profiles.json
+      - name: Soak dry-run baseline regression check
+        run: |
+          python3 scripts/compare_report_regressions.py \
+            --kind soak \
+            --baseline ops/baselines/soak_pipeline_dryrun_baseline.json \
+            --current bench/reports/soak_pipeline_report.json
+      - name: Upload soak pipeline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-pipeline-report
+          path: |
+            bench/reports/soak_pipeline_report.md
+            bench/reports/soak_pipeline_report.json
