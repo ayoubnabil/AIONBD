@@ -1,4 +1,4 @@
-# AIONBD
+# AIONBD 🦀
 
 > Licensing notice: this repository is currently under an evaluation license.  
 > Production use is prohibited for now.
