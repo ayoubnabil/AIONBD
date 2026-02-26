@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.85-bookworm AS builder
+FROM rust:bookworm AS builder
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
 COPY core ./core
 COPY server ./server
+COPY bench ./bench
 
 RUN cargo build --release -p aionbd-server
 
