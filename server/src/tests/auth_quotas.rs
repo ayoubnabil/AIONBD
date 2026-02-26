@@ -40,6 +40,7 @@ fn quota_state(max_collections: u64, max_points: u64) -> AppState {
             ("key-a".to_string(), "tenant_a".to_string()),
             ("key-b".to_string(), "tenant_b".to_string()),
         ]),
+        api_key_scopes: BTreeMap::new(),
         bearer_token_to_tenant: BTreeMap::new(),
         jwt: None,
         rate_limit_per_minute: 0,

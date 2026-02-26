@@ -1,13 +1,21 @@
 use aionbd_core::WalRecord;
+#[cfg(feature = "exp_points_count")]
+use axum::extract::rejection::JsonRejection;
 use axum::extract::{Extension, Path, Query, State};
 use axum::Json;
 use tokio::task;
 
 use crate::auth::TenantContext;
+#[cfg(feature = "exp_points_count")]
+use crate::errors::map_json_rejection;
 use crate::errors::ApiError;
 use crate::handler_utils::{
     existing_collection_write_lock, remove_collection_write_lock, scoped_collection_name,
 };
+#[cfg(feature = "exp_points_count")]
+use crate::handlers_search::filter::{matches_filter_strict, validate_filter};
+#[cfg(feature = "exp_points_count")]
+use crate::models::{CountPointsRequest, CountPointsResponse};
 use crate::models::{
     DeletePointResponse, ListPointsQuery, ListPointsResponse, PointIdResponse, PointResponse,
     DEFAULT_PAGE_LIMIT,
@@ -99,6 +107,39 @@ pub(crate) async fn list_points(
     }))
 }
 
+#[cfg(feature = "exp_points_count")]
+pub(crate) async fn count_points(
+    Path(name): Path<String>,
+    State(state): State<AppState>,
+    Extension(tenant): Extension<TenantContext>,
+    payload: Result<Json<CountPointsRequest>, JsonRejection>,
+) -> Result<Json<CountPointsResponse>, ApiError> {
+    let Json(payload) = payload.map_err(map_json_rejection)?;
+    if let Some(filter) = payload.filter.as_ref() {
+        validate_filter(filter)?;
+    }
+    let filter = payload.filter;
+
+    let (_, handle) = load_tenant_collection_handle(state, name, tenant).await?;
+    let count = task::spawn_blocking(move || {
+        let collection = handle
+            .read()
+            .map_err(|_| ApiError::internal("collection lock poisoned"))?;
+        let count = match filter.as_ref() {
+            Some(active_filter) => collection
+                .iter_points_with_payload_unordered()
+                .filter(|(_, _, payload)| matches_filter_strict(payload, active_filter))
+                .count(),
+            None => collection.len(),
+        };
+        Ok::<usize, ApiError>(count)
+    })
+    .await
+    .map_err(|_| ApiError::internal("point count worker task failed"))??;
+
+    Ok(Json(CountPointsResponse { count }))
+}
+
 pub(crate) async fn get_point(
     Path((name, id)): Path<(String, u64)>,
     State(state): State<AppState>,
@@ -129,6 +170,7 @@ pub(crate) async fn delete_point(
     State(state): State<AppState>,
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<DeletePointResponse>, ApiError> {
+    tenant.require_write()?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
     let collection_guard = existing_collection_write_lock(&state, &name)

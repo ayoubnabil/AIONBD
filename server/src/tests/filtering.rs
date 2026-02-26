@@ -162,3 +162,129 @@ async fn metadata_match_uses_tolerant_float_comparison() {
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("valid json response");
     assert_eq!(payload["hits"][0]["id"], 1);
 }
+
+#[cfg(feature = "exp_filter_must_not")]
+#[tokio::test]
+async fn filter_must_not_excludes_matching_points() {
+    let app = build_app(test_state());
+
+    let create_req = Request::builder()
+        .method("POST")
+        .uri("/collections")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"name": "must_not_filter", "dimension": 2}).to_string(),
+        ))
+        .expect("request must build");
+    let create_resp = app
+        .clone()
+        .oneshot(create_req)
+        .await
+        .expect("response expected");
+    assert_eq!(create_resp.status(), StatusCode::OK);
+
+    let upsert_first = Request::builder()
+        .method("PUT")
+        .uri("/collections/must_not_filter/points/1")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"values": [1.0, 0.0], "payload": {"tier": "gold"}}).to_string(),
+        ))
+        .expect("request must build");
+    let first_resp = app
+        .clone()
+        .oneshot(upsert_first)
+        .await
+        .expect("response expected");
+    assert_eq!(first_resp.status(), StatusCode::OK);
+
+    let upsert_second = Request::builder()
+        .method("PUT")
+        .uri("/collections/must_not_filter/points/2")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"values": [0.9, 0.0], "payload": {"tier": "silver"}}).to_string(),
+        ))
+        .expect("request must build");
+    let second_resp = app
+        .clone()
+        .oneshot(upsert_second)
+        .await
+        .expect("response expected");
+    assert_eq!(second_resp.status(), StatusCode::OK);
+
+    let search_req = Request::builder()
+        .method("POST")
+        .uri("/collections/must_not_filter/search/topk")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "query": [1.0, 0.0],
+                "metric": "dot",
+                "mode": "exact",
+                "limit": 5,
+                "filter": {
+                    "must_not": [{"field": "tier", "value": "gold"}]
+                }
+            })
+            .to_string(),
+        ))
+        .expect("request must build");
+    let search_resp = app
+        .clone()
+        .oneshot(search_req)
+        .await
+        .expect("response expected");
+    assert_eq!(search_resp.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(search_resp.into_body(), usize::MAX)
+        .await
+        .expect("body should be readable");
+    let payload: serde_json::Value = serde_json::from_slice(&body).expect("valid json response");
+    assert_eq!(payload["hits"][0]["id"], 2);
+}
+
+#[cfg(not(feature = "exp_filter_must_not"))]
+#[tokio::test]
+async fn filter_must_not_requires_feature_flag() {
+    let app = build_app(test_state());
+
+    let create_req = Request::builder()
+        .method("POST")
+        .uri("/collections")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({"name": "must_not_flag", "dimension": 2}).to_string(),
+        ))
+        .expect("request must build");
+    let create_resp = app
+        .clone()
+        .oneshot(create_req)
+        .await
+        .expect("response expected");
+    assert_eq!(create_resp.status(), StatusCode::OK);
+
+    let search_req = Request::builder()
+        .method("POST")
+        .uri("/collections/must_not_flag/search/topk")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "query": [1.0, 0.0],
+                "metric": "dot",
+                "mode": "exact",
+                "limit": 5,
+                "filter": {
+                    "must_not": [{"field": "tier", "value": "gold"}]
+                }
+            })
+            .to_string(),
+        ))
+        .expect("request must build");
+    let search_resp = app
+        .clone()
+        .oneshot(search_req)
+        .await
+        .expect("response expected");
+    assert_eq!(search_resp.status(), StatusCode::BAD_REQUEST);
+}

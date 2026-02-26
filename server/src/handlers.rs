@@ -50,6 +50,7 @@ pub(crate) async fn create_collection(
     Extension(tenant): Extension<TenantContext>,
     payload: Result<Json<CreateCollectionRequest>, JsonRejection>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
+    tenant.require_write()?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
     let response_name = canonical_collection_name(&payload.name)?;
     let name = scoped_collection_name(&state, &payload.name, &tenant)?;
@@ -192,6 +193,7 @@ pub(crate) async fn delete_collection(
     State(state): State<AppState>,
     Extension(tenant): Extension<TenantContext>,
 ) -> Result<Json<DeleteCollectionResponse>, ApiError> {
+    tenant.require_write()?;
     let response_name = canonical_collection_name(&name)?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
@@ -246,6 +248,7 @@ pub(crate) async fn upsert_point(
     Extension(tenant): Extension<TenantContext>,
     payload: Result<Json<UpsertPointRequest>, JsonRejection>,
 ) -> Result<Json<UpsertPointResponse>, ApiError> {
+    tenant.require_write()?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
     let _tenant_quota_guard = maybe_acquire_tenant_quota_guard(&state, &tenant).await?;
@@ -355,6 +358,7 @@ pub(crate) async fn upsert_points_batch(
     Extension(tenant): Extension<TenantContext>,
     payload: Result<Json<UpsertPointsBatchRequest>, JsonRejection>,
 ) -> Result<Json<UpsertPointsBatchResponse>, ApiError> {
+    tenant.require_write()?;
     let name = scoped_collection_name(&state, &name, &tenant)?;
     let Json(payload) = payload.map_err(map_json_rejection)?;
     if payload.points.is_empty() {

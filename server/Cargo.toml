@@ -5,6 +5,12 @@ edition = "2021"
 license = "Proprietary"
 description = "HTTP API skeleton for AIONBD."
 
+[features]
+default = []
+exp_auth_api_key_scopes = []
+exp_filter_must_not = []
+exp_points_count = []
+
 [dependencies]
 aionbd-core = { path = "../core" }
 anyhow = "1.0"

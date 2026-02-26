@@ -71,6 +71,8 @@ use crate::handlers::{
     upsert_point, upsert_points_batch,
 };
 use crate::handlers_metrics::{metrics, metrics_prometheus};
+#[cfg(feature = "exp_points_count")]
+use crate::handlers_points::count_points;
 use crate::handlers_points::{delete_point, get_point, list_points};
 use crate::handlers_search::{
     search_collection, search_collection_top_k, search_collection_top_k_batch,
@@ -242,6 +244,8 @@ pub(crate) fn build_app(state: AppState) -> Router {
             put(upsert_point).get(get_point).delete(delete_point),
         )
         .layer(engine_guard_layer);
+    #[cfg(feature = "exp_points_count")]
+    let data_routes = data_routes.route("/collections/:name/points/count", post(count_points));
 
     Router::new()
         .route("/live", get(live))

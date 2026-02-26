@@ -59,6 +59,15 @@ impl ApiError {
         }
     }
 
+    #[cfg(feature = "exp_auth_api_key_scopes")]
+    pub(crate) fn forbidden(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            code: "forbidden",
+            message: message.into(),
+        }
+    }
+
     pub(crate) fn resource_exhausted(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::TOO_MANY_REQUESTS,

@@ -43,6 +43,7 @@ fn jwt_state() -> AppState {
     let auth_config = AuthConfig {
         mode: AuthMode::Jwt,
         api_key_to_tenant: BTreeMap::new(),
+        api_key_scopes: BTreeMap::new(),
         bearer_token_to_tenant: BTreeMap::new(),
         jwt: Some(JwtConfig::for_tests(TEST_JWT_SECRET)),
         rate_limit_per_minute: 0,

@@ -14,6 +14,8 @@ mod env;
 pub(crate) mod jwt;
 mod rate_limit;
 
+#[cfg(feature = "exp_auth_api_key_scopes")]
+use self::env::parse_api_key_scopes;
 use self::env::{
     parse_auth_mode, parse_tenant_credentials, parse_tenant_credentials_with_fallback, parse_u64,
 };
@@ -30,10 +32,46 @@ pub(crate) enum AuthMode {
     ApiKeyOrJwt,
 }
 
+#[cfg_attr(not(feature = "exp_auth_api_key_scopes"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AccessScope {
+    Read,
+    Write,
+    Admin,
+}
+
+impl AccessScope {
+    #[cfg(feature = "exp_auth_api_key_scopes")]
+    pub(super) fn parse(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "read" | "readonly" | "read_only" => Ok(Self::Read),
+            "write" | "readwrite" | "read_write" => Ok(Self::Write),
+            "admin" => Ok(Self::Admin),
+            invalid => {
+                anyhow::bail!("api key scope must be one of read|write|admin, got '{invalid}'")
+            }
+        }
+    }
+
+    #[cfg(feature = "exp_auth_api_key_scopes")]
+    pub(crate) fn can_write(self) -> bool {
+        matches!(self, Self::Write | Self::Admin)
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::Admin => "admin",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct AuthConfig {
     pub(crate) mode: AuthMode,
     pub(crate) api_key_to_tenant: BTreeMap<String, String>,
+    pub(crate) api_key_scopes: BTreeMap<String, AccessScope>,
     pub(crate) bearer_token_to_tenant: BTreeMap<String, String>,
     pub(crate) jwt: Option<JwtConfig>,
     pub(crate) rate_limit_per_minute: u64,
@@ -47,6 +85,7 @@ impl Default for AuthConfig {
         Self {
             mode: AuthMode::Disabled,
             api_key_to_tenant: BTreeMap::new(),
+            api_key_scopes: BTreeMap::new(),
             bearer_token_to_tenant: BTreeMap::new(),
             jwt: None,
             rate_limit_per_minute: 0,
@@ -61,6 +100,16 @@ impl AuthConfig {
     pub(crate) fn from_env() -> Result<Self> {
         let mode = parse_auth_mode(std::env::var("AIONBD_AUTH_MODE").ok().as_deref())?;
         let api_key_to_tenant = parse_tenant_credentials("AIONBD_AUTH_API_KEYS")?;
+        let api_key_scopes = {
+            #[cfg(feature = "exp_auth_api_key_scopes")]
+            {
+                parse_api_key_scopes("AIONBD_AUTH_API_KEY_SCOPES")?
+            }
+            #[cfg(not(feature = "exp_auth_api_key_scopes"))]
+            {
+                BTreeMap::new()
+            }
+        };
         let bearer_tokens_raw = std::env::var("AIONBD_AUTH_BEARER_TOKENS").unwrap_or_default();
         let legacy_jwt_tokens_raw = std::env::var("AIONBD_AUTH_JWT_TOKENS").unwrap_or_default();
         if bearer_tokens_raw.trim().is_empty() && !legacy_jwt_tokens_raw.trim().is_empty() {
@@ -86,6 +135,15 @@ Tokens are treated as opaque bearer credentials."
         if rate_window_retention_minutes == 0 {
             anyhow::bail!("AIONBD_AUTH_RATE_WINDOW_RETENTION_MINUTES must be > 0");
         }
+        #[cfg(feature = "exp_auth_api_key_scopes")]
+        if api_key_scopes
+            .keys()
+            .any(|credential| !api_key_to_tenant.contains_key(credential))
+        {
+            anyhow::bail!(
+                "AIONBD_AUTH_API_KEY_SCOPES contains entries for unknown API key credentials"
+            );
+        }
 
         if matches!(
             mode,
@@ -104,6 +162,7 @@ Tokens are treated as opaque bearer credentials."
         Ok(Self {
             mode,
             api_key_to_tenant,
+            api_key_scopes,
             bearer_token_to_tenant,
             jwt,
             rate_limit_per_minute,
@@ -141,10 +200,24 @@ Tokens are treated as opaque bearer credentials."
             .api_key_to_tenant
             .get(api_key)
             .ok_or_else(|| ApiError::unauthorized("invalid API key"))?;
-        Ok(TenantContext::tenant(
+        let access_scope = {
+            #[cfg(feature = "exp_auth_api_key_scopes")]
+            {
+                self.api_key_scopes
+                    .get(api_key)
+                    .copied()
+                    .unwrap_or(AccessScope::Admin)
+            }
+            #[cfg(not(feature = "exp_auth_api_key_scopes"))]
+            {
+                AccessScope::Admin
+            }
+        };
+        Ok(TenantContext::tenant_with_scope(
             tenant.clone(),
             "api_key".to_string(),
             "api_key",
+            access_scope,
         ))
     }
 
@@ -186,6 +259,7 @@ pub(crate) struct TenantContext {
     tenant_id: Option<String>,
     principal: String,
     auth_scheme: &'static str,
+    access_scope: AccessScope,
 }
 
 impl TenantContext {
@@ -194,14 +268,25 @@ impl TenantContext {
             tenant_id: None,
             principal: "anonymous".to_string(),
             auth_scheme: "disabled",
+            access_scope: AccessScope::Admin,
         }
     }
 
     pub(crate) fn tenant(tenant_id: String, principal: String, auth_scheme: &'static str) -> Self {
+        Self::tenant_with_scope(tenant_id, principal, auth_scheme, AccessScope::Admin)
+    }
+
+    pub(crate) fn tenant_with_scope(
+        tenant_id: String,
+        principal: String,
+        auth_scheme: &'static str,
+        access_scope: AccessScope,
+    ) -> Self {
         Self {
             tenant_id: Some(tenant_id),
             principal,
             auth_scheme,
+            access_scope,
         }
     }
 
@@ -211,6 +296,27 @@ impl TenantContext {
 
     pub(crate) fn tenant_id(&self) -> Option<&str> {
         self.tenant_id.as_deref()
+    }
+
+    pub(crate) fn access_scope(&self) -> AccessScope {
+        self.access_scope
+    }
+
+    pub(crate) fn require_write(&self) -> Result<(), ApiError> {
+        #[cfg(feature = "exp_auth_api_key_scopes")]
+        {
+            if self.access_scope.can_write() {
+                return Ok(());
+            }
+            return Err(ApiError::forbidden(
+                "write operation requires write or admin API key scope",
+            ));
+        }
+
+        #[cfg(not(feature = "exp_auth_api_key_scopes"))]
+        {
+            Ok(())
+        }
     }
 }
 
@@ -255,6 +361,7 @@ pub(crate) async fn auth_rate_limit_audit(
         tenant = %tenant.tenant_key(),
         principal = %tenant.principal,
         auth_scheme = %tenant.auth_scheme,
+        access_scope = tenant.access_scope().as_str(),
         method = %method,
         path = %path,
         status = response.status().as_u16(),

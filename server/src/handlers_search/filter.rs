@@ -6,43 +6,20 @@ use crate::models::{
 };
 
 pub(crate) fn validate_filter(filter: &SearchFilter) -> Result<(), ApiError> {
+    #[cfg(not(feature = "exp_filter_must_not"))]
+    if !filter.must_not.is_empty() {
+        return Err(ApiError::invalid_argument(
+            "filter.must_not requires build feature exp_filter_must_not",
+        ));
+    }
+
     for clause in filter.must.iter().chain(filter.should.iter()) {
-        match clause {
-            FilterClause::Match(FilterMatchClause { field, .. }) => {
-                if field.trim().is_empty() {
-                    return Err(ApiError::invalid_argument(
-                        "filter field names must not be empty",
-                    ));
-                }
-            }
-            FilterClause::Range(FilterRangeClause {
-                field,
-                gt,
-                gte,
-                lt,
-                lte,
-            }) => {
-                if field.trim().is_empty() {
-                    return Err(ApiError::invalid_argument(
-                        "filter field names must not be empty",
-                    ));
-                }
-                if gt.is_none() && gte.is_none() && lt.is_none() && lte.is_none() {
-                    return Err(ApiError::invalid_argument(
-                        "range filter requires at least one bound",
-                    ));
-                }
-                let lower = gte.or(*gt);
-                let upper = lte.or(*lt);
-                if let (Some(lower), Some(upper)) = (lower, upper) {
-                    if lower > upper {
-                        return Err(ApiError::invalid_argument(
-                            "range filter lower bound must be <= upper bound",
-                        ));
-                    }
-                }
-            }
-        }
+        validate_clause(clause)?;
+    }
+
+    #[cfg(feature = "exp_filter_must_not")]
+    for clause in &filter.must_not {
+        validate_clause(clause)?;
     }
 
     if let Some(required) = filter.minimum_should_match {
@@ -59,6 +36,13 @@ pub(crate) fn validate_filter(filter: &SearchFilter) -> Result<(), ApiError> {
 pub(crate) fn matches_filter_strict(payload: &PointPayload, filter: &SearchFilter) -> bool {
     for clause in &filter.must {
         if !matches_clause(payload, clause) {
+            return false;
+        }
+    }
+
+    #[cfg(feature = "exp_filter_must_not")]
+    for clause in &filter.must_not {
+        if matches_clause(payload, clause) {
             return false;
         }
     }
@@ -91,6 +75,47 @@ pub(crate) fn matches_filter_strict(payload: &PointPayload, filter: &SearchFilte
     }
 
     false
+}
+
+fn validate_clause(clause: &FilterClause) -> Result<(), ApiError> {
+    match clause {
+        FilterClause::Match(FilterMatchClause { field, .. }) => {
+            if field.trim().is_empty() {
+                return Err(ApiError::invalid_argument(
+                    "filter field names must not be empty",
+                ));
+            }
+        }
+        FilterClause::Range(FilterRangeClause {
+            field,
+            gt,
+            gte,
+            lt,
+            lte,
+        }) => {
+            if field.trim().is_empty() {
+                return Err(ApiError::invalid_argument(
+                    "filter field names must not be empty",
+                ));
+            }
+            if gt.is_none() && gte.is_none() && lt.is_none() && lte.is_none() {
+                return Err(ApiError::invalid_argument(
+                    "range filter requires at least one bound",
+                ));
+            }
+            let lower = gte.or(*gt);
+            let upper = lte.or(*lt);
+            if let (Some(lower), Some(upper)) = (lower, upper) {
+                if lower > upper {
+                    return Err(ApiError::invalid_argument(
+                        "range filter lower bound must be <= upper bound",
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn matches_clause(payload: &PointPayload, clause: &FilterClause) -> bool {

@@ -30,6 +30,8 @@ mod persistence_metrics;
 mod persistence_rollbacks;
 mod persistence_sync_mode;
 mod points_batch;
+#[cfg(feature = "exp_points_count")]
+mod points_count;
 mod runtime_maps_metrics;
 mod search;
 mod search_advanced;

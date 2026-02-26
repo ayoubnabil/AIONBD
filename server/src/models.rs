@@ -220,6 +220,19 @@ pub(crate) struct ListPointsResponse {
     pub(crate) next_after_id: Option<u64>,
 }
 
+#[cfg(feature = "exp_points_count")]
+#[derive(Debug, Deserialize)]
+pub(crate) struct CountPointsRequest {
+    #[serde(default)]
+    pub(crate) filter: Option<SearchFilter>,
+}
+
+#[cfg(feature = "exp_points_count")]
+#[derive(Debug, Serialize)]
+pub(crate) struct CountPointsResponse {
+    pub(crate) count: usize,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct SearchRequest {
     pub(crate) query: Vec<f32>,
@@ -322,6 +335,8 @@ pub(crate) struct SearchFilter {
     pub(crate) must: Vec<FilterClause>,
     #[serde(default)]
     pub(crate) should: Vec<FilterClause>,
+    #[serde(default)]
+    pub(crate) must_not: Vec<FilterClause>,
     #[serde(default)]
     pub(crate) minimum_should_match: Option<usize>,
 }

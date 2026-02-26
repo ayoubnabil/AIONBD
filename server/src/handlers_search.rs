@@ -17,7 +17,7 @@ use crate::write_path::load_tenant_collection_handle;
 
 mod engine;
 mod engine_batch;
-mod filter;
+pub(crate) mod filter;
 mod scoring;
 
 const SEARCH_INLINE_MAX_POINTS: usize = 8_192;

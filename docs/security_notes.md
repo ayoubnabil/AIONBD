@@ -25,6 +25,7 @@ Production recommendation:
 - avoid `disabled`
 - prefer `jwt` or `api_key_or_jwt`
 - rotate secrets/keys on a schedule
+- use `AIONBD_AUTH_API_KEY_SCOPES` to limit API keys to `read`, `write`, or `admin` privileges (enforced only when built with `exp_auth_api_key_scopes`)
 
 ## 3. Tenant isolation and quotas
 

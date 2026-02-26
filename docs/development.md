@@ -125,6 +125,7 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_WAL_PATH` (default: `data/aionbd_wal.jsonl`)
 - `AIONBD_AUTH_MODE` (default: `disabled`, values: `disabled|api_key|bearer_token|api_key_or_bearer_token|jwt|api_key_or_jwt`)
 - `AIONBD_AUTH_API_KEYS` (default: empty, format `<tenant>:<api_key>[,...]`)
+- `AIONBD_AUTH_API_KEY_SCOPES` (default: empty, format `<api_key>:<scope>[,...]`, scope in `read|write|admin`, defaults to `admin`; enforced only with build feature `exp_auth_api_key_scopes`)
 - `AIONBD_AUTH_BEARER_TOKENS` (default: empty, format `<tenant>:<token>[,...]`)
 - `AIONBD_AUTH_JWT_HS256_SECRET` (required when mode includes `jwt`)
 - `AIONBD_AUTH_JWT_ISSUER` (optional exact issuer)
@@ -138,6 +139,29 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
 - `AIONBD_L2_INDEX_BUILD_COOLDOWN_MS` (default: `1000`; set `0` to disable cooldown throttling)
 - `AIONBD_L2_INDEX_BUILD_MAX_IN_FLIGHT` (default: `2`; maximum concurrent asynchronous IVF build jobs)
 - `AIONBD_L2_INDEX_WARMUP_ON_BOOT` (default: `true`; set `false` to skip startup warmup builds)
+
+### Experimental build flags (optional)
+
+- `exp_auth_api_key_scopes`
+  - Enables API key scope enforcement (`read|write|admin`) from `AIONBD_AUTH_API_KEY_SCOPES`.
+  - Build/run:
+    ```bash
+    cargo run -p aionbd-server --features exp_auth_api_key_scopes
+    ```
+- `exp_filter_must_not`
+  - Enables `filter.must_not` for negative payload filtering on search and count requests.
+  - Build/run:
+    ```bash
+    cargo run -p aionbd-server --features exp_filter_must_not
+    ```
+- `exp_points_count`
+  - Enables `POST /collections/:name/points/count`.
+  - Build/run:
+    ```bash
+    cargo run -p aionbd-server --features exp_points_count
+    ```
+- Multiple flags can be combined:
+  - `cargo run -p aionbd-server --features exp_auth_api_key_scopes,exp_filter_must_not,exp_points_count`
 
 Durability warning:
 - If `AIONBD_WAL_SYNC_ON_WRITE=false`, acknowledged writes may be lost on crash/power loss.
@@ -159,12 +183,26 @@ Durability warning:
 - `POST /collections/:name/search/topk`: top-k search
   `{query, metric, limit, mode, target_recall, filter}`
   with `limit <= AIONBD_MAX_TOPK_LIMIT` (default `10` when omitted, capped by config)
+- filter supports `must` and `should`; `must_not` is available only with build feature `exp_filter_must_not`
 - `GET /collections/:name/points`: list point ids with pagination:
   `?offset=<n>&limit=<n>` (offset mode) or `?after_id=<id>&limit=<n>` (cursor mode),
   with `limit <= AIONBD_MAX_PAGE_LIMIT` (default `100` when omitted, capped by config)
 - `PUT /collections/:name/points/:id`: upsert point `{values, payload}`
 - `GET /collections/:name/points/:id`: read point
 - `DELETE /collections/:name/points/:id`: delete point
+- `POST /collections/:name/points/count`: count points, optional `{filter}` (build feature `exp_points_count`)
+
+Example request with `must_not` + count:
+```bash
+curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/count \
+  -H 'content-type: application/json' \
+  -d '{
+    "filter": {
+      "must": [{"field": "region", "value": "eu"}],
+      "must_not": [{"field": "tier", "value": "free"}]
+    }
+  }'
+```
 
 ## Ops artifacts
 

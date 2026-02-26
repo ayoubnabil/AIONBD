@@ -131,7 +131,8 @@ python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 ```bash
 export AIONBD_AUTH_MODE=api_key
 export AIONBD_AUTH_API_KEYS='tenant-a:secret-key-a'
-cargo run -p aionbd-server
+export AIONBD_AUTH_API_KEY_SCOPES='secret-key-a:admin'
+cargo run -p aionbd-server --features exp_auth_api_key_scopes
 ```
 
 Then call endpoints with:
@@ -164,9 +165,72 @@ cargo run -p aionbd-server
 - `DELETE /collections/:name/points/:id`
 - `POST /collections/:name/points` (batch upsert)
 - `GET /collections/:name/points` (offset/cursor pagination)
+- `POST /collections/:name/points/count` (feature: `exp_points_count`)
 - `POST /collections/:name/search` (top-1)
 - `POST /collections/:name/search/topk`
 - `POST /collections/:name/search/topk/batch`
+
+## Experimental Build Features
+
+All experimental features are compile-time opt-in and disabled by default.
+
+- `exp_auth_api_key_scopes`:
+  - Purpose: enforce API key scopes (`read|write|admin`) on write routes.
+  - Enable:
+    ```bash
+    cargo run -p aionbd-server --features exp_auth_api_key_scopes
+    ```
+  - Minimal setup:
+    ```bash
+    export AIONBD_AUTH_MODE=api_key
+    export AIONBD_AUTH_API_KEYS='tenant-a:secret-key-a'
+    export AIONBD_AUTH_API_KEY_SCOPES='secret-key-a:read'
+    ```
+  - Result: read routes are allowed, write routes return `403` with read-only keys.
+
+- `exp_filter_must_not`:
+  - Purpose: add negative filter clauses (`must_not`) for search/count filters.
+  - Enable:
+    ```bash
+    cargo run -p aionbd-server --features exp_filter_must_not
+    ```
+  - Search example:
+    ```bash
+    curl -sS -X POST http://127.0.0.1:8080/collections/demo/search/topk \
+      -H 'content-type: application/json' \
+      -d '{
+        "query": [0.1, 0.2, 0.3, 0.4],
+        "metric": "l2",
+        "limit": 5,
+        "filter": {
+          "must_not": [{"field": "tier", "value": "gold"}]
+        }
+      }'
+    ```
+  - Without this feature, requests using `must_not` return `400`.
+
+- `exp_points_count`:
+  - Purpose: enable `POST /collections/:name/points/count` with optional filter.
+  - Enable:
+    ```bash
+    cargo run -p aionbd-server --features exp_points_count
+    ```
+  - Endpoint example:
+    ```bash
+    curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/count \
+      -H 'content-type: application/json' \
+      -d '{"filter":{"must":[{"field":"tier","value":"gold"}]}}'
+    ```
+    Response shape:
+    ```json
+    {"count": 42}
+    ```
+
+Enable several experimental features together:
+
+```bash
+cargo run -p aionbd-server --features exp_auth_api_key_scopes,exp_filter_must_not,exp_points_count
+```
 
 ## Performance and Benchmarks
 
@@ -248,6 +312,7 @@ Durability warning:
 | `AIONBD_TLS_KEY_PATH` | none | TLS key path (required when TLS enabled) |
 | `AIONBD_AUTH_MODE` | `disabled` | Auth mode (`disabled`, `api_key`, `bearer_token`, `jwt`, mixed modes) |
 | `AIONBD_AUTH_API_KEYS` | empty | API key credentials (`tenant:key`) |
+| `AIONBD_AUTH_API_KEY_SCOPES` | empty | API key scopes (`key:read|write|admin`), defaults to `admin` when omitted; enforced only with build feature `exp_auth_api_key_scopes` |
 | `AIONBD_AUTH_BEARER_TOKENS` | empty | Bearer token credentials (`tenant:token`) |
 | `AIONBD_AUTH_JWT_HS256_SECRET` | none | JWT secret (required in JWT mode) |
 | `AIONBD_AUTH_RATE_LIMIT_PER_MINUTE` | `0` | Tenant rate limiting (`0` disables) |

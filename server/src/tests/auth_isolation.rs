@@ -5,7 +5,7 @@ use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
-use crate::auth::{AuthConfig, AuthMode};
+use crate::auth::{AccessScope, AuthConfig, AuthMode};
 use crate::build_app;
 use crate::config::AppConfig;
 use crate::state::{AppState, TenantRateWindow};
@@ -40,6 +40,7 @@ fn auth_state() -> AppState {
             ("key-a".to_string(), "tenant_a".to_string()),
             ("key-b".to_string(), "tenant_b".to_string()),
         ]),
+        api_key_scopes: BTreeMap::new(),
         bearer_token_to_tenant: BTreeMap::new(),
         jwt: None,
         rate_limit_per_minute: 0,
@@ -79,6 +80,139 @@ async fn auth_mode_requires_credentials() {
         .await
         .expect("response expected");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[cfg(feature = "exp_auth_api_key_scopes")]
+#[tokio::test]
+async fn read_only_api_key_scope_blocks_write_routes() {
+    let mut state = auth_state();
+    let mut auth_config = (*state.auth_config).clone();
+    auth_config.api_key_to_tenant = BTreeMap::from([
+        ("key-read".to_string(), "tenant_a".to_string()),
+        ("key-write".to_string(), "tenant_a".to_string()),
+    ]);
+    auth_config.api_key_scopes = BTreeMap::from([
+        ("key-read".to_string(), AccessScope::Read),
+        ("key-write".to_string(), AccessScope::Write),
+    ]);
+    state = AppState::with_collections_and_auth(
+        (*state.config).clone(),
+        std::collections::BTreeMap::new(),
+        auth_config,
+    );
+    let app = build_app(state);
+
+    let create = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "POST",
+            "/collections",
+            Some("key-write"),
+            Some(json!({"name":"scoped","dimension":3})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(create.status(), StatusCode::OK);
+
+    let seed = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "PUT",
+            "/collections/scoped/points/1",
+            Some("key-write"),
+            Some(json!({"values":[1.0,2.0,3.0]})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(seed.status(), StatusCode::OK);
+
+    let read_ok = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "GET",
+            "/collections/scoped/points/1",
+            Some("key-read"),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(read_ok.status(), StatusCode::OK);
+
+    let write_rejected = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "PUT",
+            "/collections/scoped/points/1",
+            Some("key-read"),
+            Some(json!({"values":[9.0,9.0,9.0]})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(write_rejected.status(), StatusCode::FORBIDDEN);
+    let write_rejected_json = super::json_body(write_rejected).await;
+    assert_eq!(write_rejected_json["code"], "forbidden");
+
+    let create_rejected = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "POST",
+            "/collections",
+            Some("key-read"),
+            Some(json!({"name":"blocked","dimension":3})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(create_rejected.status(), StatusCode::FORBIDDEN);
+
+    let list = app
+        .oneshot(request_with_api_key(
+            "GET",
+            "/collections",
+            Some("key-read"),
+            None,
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(list.status(), StatusCode::OK);
+}
+
+#[cfg(not(feature = "exp_auth_api_key_scopes"))]
+#[tokio::test]
+async fn api_key_scope_configuration_is_ignored_when_feature_is_disabled() {
+    let mut state = auth_state();
+    let mut auth_config = (*state.auth_config).clone();
+    auth_config.api_key_to_tenant =
+        BTreeMap::from([("key-read".to_string(), "tenant_a".to_string())]);
+    auth_config.api_key_scopes = BTreeMap::from([("key-read".to_string(), AccessScope::Read)]);
+    state = AppState::with_collections_and_auth(
+        (*state.config).clone(),
+        std::collections::BTreeMap::new(),
+        auth_config,
+    );
+    let app = build_app(state);
+
+    let create = app
+        .clone()
+        .oneshot(request_with_api_key(
+            "POST",
+            "/collections",
+            Some("key-read"),
+            Some(json!({"name":"scoped","dimension":3})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(create.status(), StatusCode::OK);
+
+    let upsert = app
+        .oneshot(request_with_api_key(
+            "PUT",
+            "/collections/scoped/points/1",
+            Some("key-read"),
+            Some(json!({"values":[1.0,2.0,3.0]})),
+        ))
+        .await
+        .expect("response expected");
+    assert_eq!(upsert.status(), StatusCode::OK);
 }
 
 #[tokio::test]
