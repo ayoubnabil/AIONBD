@@ -17,6 +17,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sdk/go/go.mod
       - name: File size guard
         run: ./scripts/check_file_sizes.sh
       - name: MVP load profile dry-run gate

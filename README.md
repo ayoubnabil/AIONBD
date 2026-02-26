@@ -126,7 +126,17 @@ python -m pip install -e .
 python -c "from aionbd import AionBDClient; print(AionBDClient().live())"
 ```
 
-### 9. Authentication quick start (API key mode)
+### 9. Go SDK quick start
+
+```bash
+cd sdk/go
+go test ./...
+```
+
+Full Go SDK docs: `sdk/go/README.md`.
+Go SDK changelog: `sdk/go/CHANGELOG.md`.
+
+### 10. Authentication quick start (API key mode)
 
 ```bash
 export AIONBD_AUTH_MODE=api_key
@@ -142,7 +152,7 @@ curl -sS -X GET http://127.0.0.1:8080/collections \
   -H 'x-api-key: secret-key-a'
 ```
 
-### 10. Memory budget quick start
+### 11. Memory budget quick start
 
 ```bash
 export AIONBD_MEMORY_BUDGET_MB=128
