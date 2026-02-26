@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from path_guard import resolve_io_path
+except ModuleNotFoundError:
+    from scripts.path_guard import resolve_io_path
+
 SOAK_SCRIPT = Path(__file__).resolve().parent / "run_soak_test.py"
 REQUIRED_FIELDS = (
     "duration_seconds",
@@ -120,8 +125,7 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("write-ratio must be in [0.0, 1.0]")
 
 
-def run_soak_profile(args: argparse.Namespace) -> dict[str, Any]:
-    raw_report_path = Path(args.raw_report_path)
+def run_soak_profile(args: argparse.Namespace, raw_report_path: Path) -> dict[str, Any]:
     raw_report_path.parent.mkdir(parents=True, exist_ok=True)
     if raw_report_path.exists():
         raw_report_path.unlink()
@@ -275,12 +279,14 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    payload = run_soak_profile(args)
+    raw_report_path = resolve_io_path(args.raw_report_path, label="raw-report-path")
+    report_md_path = resolve_io_path(args.report_path, label="report-path")
+    report_json_path = resolve_io_path(args.report_json_path, label="report-json-path")
+
+    payload = run_soak_profile(args, raw_report_path)
     failures = evaluate(args, payload)
     generated_at = datetime.now(timezone.utc).isoformat()
 
-    report_md_path = Path(args.report_path)
-    report_json_path = Path(args.report_json_path)
     report_md_path.parent.mkdir(parents=True, exist_ok=True)
     report_json_path.parent.mkdir(parents=True, exist_ok=True)
 
