@@ -30,6 +30,13 @@ run_python_checks() {
   python3 -m unittest discover -s sdk/python/tests -v
 }
 
+run_go_sdk_checks() {
+  (
+    cd sdk/go
+    go test ./...
+  )
+}
+
 run_ops_checks() {
   ./scripts/check_file_sizes.sh
   python3 scripts/check_alert_runbook_sync.py
@@ -57,6 +64,7 @@ run_rust_full_checks() {
 if [[ "$mode" == "full" ]]; then
   run_rust_full_checks
   run_python_checks
+  run_go_sdk_checks
   run_ops_checks
   exit 0
 fi
@@ -64,6 +72,7 @@ fi
 if [[ "$mode" == "--fast" ]]; then
   run_rust_fast_checks
   run_python_checks
+  run_go_sdk_checks
   run_ops_checks
   exit 0
 fi
@@ -87,6 +96,7 @@ fi
 
 rust_changed=0
 python_changed=0
+go_changed=0
 ops_changed=0
 for file in "${!changed_map[@]}"; do
   case "$file" in
@@ -95,6 +105,9 @@ for file in "${!changed_map[@]}"; do
       ;;
     sdk/python/*)
       python_changed=1
+      ;;
+    sdk/go/*)
+      go_changed=1
       ;;
     docs/*|ops/*|scripts/check_file_sizes.sh|scripts/check_alert_runbook_sync.py|scripts/check_backup_restore_smoke.py|scripts/check_collection_export_import_smoke.py|scripts/check_chaos_pipeline_smoke.py|scripts/check_refresh_report_baselines_smoke.py|scripts/check_report_regressions_smoke.py|scripts/check_soak_harness_smoke.py|scripts/check_soak_pipeline_smoke.py|scripts/state_backup_restore.py|scripts/collection_export_import.py|scripts/compare_report_regressions.py|scripts/refresh_report_baselines.py|scripts/run_chaos_pipeline.py|scripts/run_soak_test.py|scripts/run_soak_pipeline.py|scripts/verify_chaos.sh|scripts/verify_soak.sh|scripts/verify_local.sh)
       ops_changed=1
@@ -110,10 +123,14 @@ if [[ "$python_changed" -eq 1 ]]; then
   run_python_checks
 fi
 
+if [[ "$go_changed" -eq 1 ]]; then
+  run_go_sdk_checks
+fi
+
 if [[ "$ops_changed" -eq 1 ]]; then
   run_ops_checks
 fi
 
-if [[ "$rust_changed" -eq 0 && "$python_changed" -eq 0 && "$ops_changed" -eq 0 ]]; then
-  echo "No Rust, SDK Python, or ops/runbook changes detected; skipping checks."
+if [[ "$rust_changed" -eq 0 && "$python_changed" -eq 0 && "$go_changed" -eq 0 && "$ops_changed" -eq 0 ]]; then
+  echo "No Rust, SDK Python/Go, or ops/runbook changes detected; skipping checks."
 fi

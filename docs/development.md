@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - Rust toolchain (stable)
+- Go 1.22+
 - Python 3.10+
 
 ## Rust commands
@@ -20,6 +21,12 @@ cargo clippy --workspace --all-targets -- -D warnings
 Test:
 ```bash
 cargo test --workspace
+```
+
+Go SDK tests:
+```bash
+cd sdk/go
+go test ./...
 ```
 
 Full local verification:
