@@ -119,9 +119,10 @@ Bundle output:
 
 GitHub workflow `.github/workflows/release.yml` provides:
 
-- release bundle build and artifact upload
-- container image build and push to GHCR
-- GitHub release publication for tag-triggered runs
+- Manual trigger (`workflow_dispatch`) with `version` creates and pushes a release tag (`v<version>`).
+- Tag-triggered run builds and uploads release bundles (`.tar.gz` + `.sha256`) and publishes a GitHub release.
+- Container image is pushed to GHCR as `ghcr.io/<org>/aionbd-server:v<version>`.
+- `latest` is only updated for stable tags (`vX.Y.Z`); prerelease tags (`vX.Y.Z-...`) do not overwrite `latest`.
 
 ## Production Readiness Checklist
 

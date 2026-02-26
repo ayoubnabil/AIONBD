@@ -307,6 +307,7 @@ Use throughput-first only if potential acknowledged-write loss on crash is accep
   - Kubernetes manifest: `ops/deploy/kubernetes/aionbd.yaml`
   - Helm chart: `ops/deploy/helm/aionbd`
   - CI release pipeline: `.github/workflows/release.yml`
+  - Test release flow: run `Release` workflow manually with version like `0.1.0-rc.1` (creates `v0.1.0-rc.1` tag + prerelease assets)
 
 ## Backup, Restore, Export, Import
 
