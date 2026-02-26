@@ -71,6 +71,7 @@ impl AccessScope {
 pub(crate) struct AuthConfig {
     pub(crate) mode: AuthMode,
     pub(crate) api_key_to_tenant: BTreeMap<String, String>,
+    #[cfg(feature = "exp_auth_api_key_scopes")]
     pub(crate) api_key_scopes: BTreeMap<String, AccessScope>,
     pub(crate) bearer_token_to_tenant: BTreeMap<String, String>,
     pub(crate) jwt: Option<JwtConfig>,
@@ -85,6 +86,7 @@ impl Default for AuthConfig {
         Self {
             mode: AuthMode::Disabled,
             api_key_to_tenant: BTreeMap::new(),
+            #[cfg(feature = "exp_auth_api_key_scopes")]
             api_key_scopes: BTreeMap::new(),
             bearer_token_to_tenant: BTreeMap::new(),
             jwt: None,
@@ -100,16 +102,8 @@ impl AuthConfig {
     pub(crate) fn from_env() -> Result<Self> {
         let mode = parse_auth_mode(std::env::var("AIONBD_AUTH_MODE").ok().as_deref())?;
         let api_key_to_tenant = parse_tenant_credentials("AIONBD_AUTH_API_KEYS")?;
-        let api_key_scopes = {
-            #[cfg(feature = "exp_auth_api_key_scopes")]
-            {
-                parse_api_key_scopes("AIONBD_AUTH_API_KEY_SCOPES")?
-            }
-            #[cfg(not(feature = "exp_auth_api_key_scopes"))]
-            {
-                BTreeMap::new()
-            }
-        };
+        #[cfg(feature = "exp_auth_api_key_scopes")]
+        let api_key_scopes = parse_api_key_scopes("AIONBD_AUTH_API_KEY_SCOPES")?;
         let bearer_tokens_raw = std::env::var("AIONBD_AUTH_BEARER_TOKENS").unwrap_or_default();
         let legacy_jwt_tokens_raw = std::env::var("AIONBD_AUTH_JWT_TOKENS").unwrap_or_default();
         if bearer_tokens_raw.trim().is_empty() && !legacy_jwt_tokens_raw.trim().is_empty() {
@@ -162,6 +156,7 @@ Tokens are treated as opaque bearer credentials."
         Ok(Self {
             mode,
             api_key_to_tenant,
+            #[cfg(feature = "exp_auth_api_key_scopes")]
             api_key_scopes,
             bearer_token_to_tenant,
             jwt,

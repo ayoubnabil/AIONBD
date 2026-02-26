@@ -5,7 +5,9 @@ use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
-use crate::auth::{AccessScope, AuthConfig, AuthMode};
+#[cfg(feature = "exp_auth_api_key_scopes")]
+use crate::auth::AccessScope;
+use crate::auth::{AuthConfig, AuthMode};
 use crate::build_app;
 use crate::config::AppConfig;
 use crate::state::{AppState, TenantRateWindow};
@@ -40,6 +42,7 @@ fn auth_state() -> AppState {
             ("key-a".to_string(), "tenant_a".to_string()),
             ("key-b".to_string(), "tenant_b".to_string()),
         ]),
+        #[cfg(feature = "exp_auth_api_key_scopes")]
         api_key_scopes: BTreeMap::new(),
         bearer_token_to_tenant: BTreeMap::new(),
         jwt: None,
@@ -183,7 +186,6 @@ async fn api_key_scope_configuration_is_ignored_when_feature_is_disabled() {
     let mut auth_config = (*state.auth_config).clone();
     auth_config.api_key_to_tenant =
         BTreeMap::from([("key-read".to_string(), "tenant_a".to_string())]);
-    auth_config.api_key_scopes = BTreeMap::from([("key-read".to_string(), AccessScope::Read)]);
     state = AppState::with_collections_and_auth(
         (*state.config).clone(),
         std::collections::BTreeMap::new(),
