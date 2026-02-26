@@ -23,6 +23,8 @@ mod list_points_offset;
 mod metrics;
 mod metrics_backlog;
 mod metrics_prometheus;
+#[cfg(feature = "exp_payload_mutation_api")]
+mod payload_mutations;
 mod persistence;
 mod persistence_chaos;
 mod persistence_degraded;

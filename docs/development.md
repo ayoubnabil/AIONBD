@@ -160,8 +160,16 @@ Default benchmark gates used by `./scripts/verify_bench.sh`:
     ```bash
     cargo run -p aionbd-server --features exp_points_count
     ```
+- `exp_payload_mutation_api`
+  - Enables payload mutation APIs:
+    - `POST /collections/:name/points/payload/set`
+    - `POST /collections/:name/points/payload/delete`
+  - Build/run:
+    ```bash
+    cargo run -p aionbd-server --features exp_payload_mutation_api
+    ```
 - Multiple flags can be combined:
-  - `cargo run -p aionbd-server --features exp_auth_api_key_scopes,exp_filter_must_not,exp_points_count`
+  - `cargo run -p aionbd-server --features exp_auth_api_key_scopes,exp_filter_must_not,exp_points_count,exp_payload_mutation_api`
 
 Durability warning:
 - If `AIONBD_WAL_SYNC_ON_WRITE=false`, acknowledged writes may be lost on crash/power loss.
@@ -191,6 +199,8 @@ Durability warning:
 - `GET /collections/:name/points/:id`: read point
 - `DELETE /collections/:name/points/:id`: delete point
 - `POST /collections/:name/points/count`: count points, optional `{filter}` (build feature `exp_points_count`)
+- `POST /collections/:name/points/payload/set`: merge/overwrite payload fields for selected point IDs (build feature `exp_payload_mutation_api`)
+- `POST /collections/:name/points/payload/delete`: remove payload keys for selected point IDs (build feature `exp_payload_mutation_api`)
 
 Example request with `must_not` + count:
 ```bash
@@ -202,6 +212,17 @@ curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/count \
       "must_not": [{"field": "tier", "value": "free"}]
     }
   }'
+```
+
+Example payload mutation requests:
+```bash
+curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/payload/set \
+  -H 'content-type: application/json' \
+  -d '{"points":[1,2], "payload":{"tier":"pro","region":"eu"}}'
+
+curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/payload/delete \
+  -H 'content-type: application/json' \
+  -d '{"points":[1,2], "keys":["region"]}'
 ```
 
 ## Ops artifacts

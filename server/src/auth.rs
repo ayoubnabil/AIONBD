@@ -301,11 +301,12 @@ impl TenantContext {
         #[cfg(feature = "exp_auth_api_key_scopes")]
         {
             if self.access_scope.can_write() {
-                return Ok(());
+                Ok(())
+            } else {
+                Err(ApiError::forbidden(
+                    "write operation requires write or admin API key scope",
+                ))
             }
-            return Err(ApiError::forbidden(
-                "write operation requires write or admin API key scope",
-            ));
         }
 
         #[cfg(not(feature = "exp_auth_api_key_scopes"))]

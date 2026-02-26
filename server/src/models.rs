@@ -220,6 +220,27 @@ pub(crate) struct ListPointsResponse {
     pub(crate) next_after_id: Option<u64>,
 }
 
+#[cfg(feature = "exp_payload_mutation_api")]
+#[derive(Debug, Deserialize)]
+pub(crate) struct SetPayloadRequest {
+    pub(crate) points: Vec<u64>,
+    #[serde(default)]
+    pub(crate) payload: PointPayload,
+}
+
+#[cfg(feature = "exp_payload_mutation_api")]
+#[derive(Debug, Deserialize)]
+pub(crate) struct DeletePayloadKeysRequest {
+    pub(crate) points: Vec<u64>,
+    pub(crate) keys: Vec<String>,
+}
+
+#[cfg(feature = "exp_payload_mutation_api")]
+#[derive(Debug, Serialize)]
+pub(crate) struct PayloadMutationResponse {
+    pub(crate) updated: usize,
+}
+
 #[cfg(feature = "exp_points_count")]
 #[derive(Debug, Deserialize)]
 pub(crate) struct CountPointsRequest {

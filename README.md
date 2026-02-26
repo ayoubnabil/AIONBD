@@ -166,6 +166,8 @@ cargo run -p aionbd-server
 - `POST /collections/:name/points` (batch upsert)
 - `GET /collections/:name/points` (offset/cursor pagination)
 - `POST /collections/:name/points/count` (feature: `exp_points_count`)
+- `POST /collections/:name/points/payload/set` (feature: `exp_payload_mutation_api`)
+- `POST /collections/:name/points/payload/delete` (feature: `exp_payload_mutation_api`)
 - `POST /collections/:name/search` (top-1)
 - `POST /collections/:name/search/topk`
 - `POST /collections/:name/search/topk/batch`
@@ -226,10 +228,32 @@ All experimental features are compile-time opt-in and disabled by default.
     {"count": 42}
     ```
 
+- `exp_payload_mutation_api`:
+  - Purpose: enable partial metadata updates without re-sending vectors.
+  - Endpoints:
+    - `POST /collections/:name/points/payload/set`
+    - `POST /collections/:name/points/payload/delete`
+  - Enable:
+    ```bash
+    cargo run -p aionbd-server --features exp_payload_mutation_api
+    ```
+  - Set payload fields:
+    ```bash
+    curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/payload/set \
+      -H 'content-type: application/json' \
+      -d '{"points":[1,2], "payload":{"tier":"pro","region":"eu"}}'
+    ```
+  - Delete payload fields:
+    ```bash
+    curl -sS -X POST http://127.0.0.1:8080/collections/demo/points/payload/delete \
+      -H 'content-type: application/json' \
+      -d '{"points":[1,2], "keys":["region"]}'
+    ```
+
 Enable several experimental features together:
 
 ```bash
-cargo run -p aionbd-server --features exp_auth_api_key_scopes,exp_filter_must_not,exp_points_count
+cargo run -p aionbd-server --features exp_auth_api_key_scopes,exp_filter_must_not,exp_points_count,exp_payload_mutation_api
 ```
 
 ## Performance and Benchmarks

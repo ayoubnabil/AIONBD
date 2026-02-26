@@ -10,6 +10,7 @@ default = []
 exp_auth_api_key_scopes = []
 exp_filter_must_not = []
 exp_points_count = []
+exp_payload_mutation_api = []
 
 [dependencies]
 aionbd-core = { path = "../core" }

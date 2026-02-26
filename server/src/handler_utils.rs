@@ -97,10 +97,13 @@ pub(crate) fn validate_upsert_input(
         }
     }
 
+    validate_payload_keys(payload)
+}
+
+pub(crate) fn validate_payload_keys(payload: &PointPayload) -> Result<(), ApiError> {
     if payload.keys().any(|key| key.trim().is_empty()) {
         return Err(ApiError::invalid_argument("payload keys must not be empty"));
     }
-
     Ok(())
 }
 

@@ -12,6 +12,9 @@
 //! - `PUT/GET/DELETE /collections/:name/points/:id`: point CRUD
 //! - `POST /collections/:name/points`: batch upsert points
 //! - `GET /collections/:name/points`: paginated list of point ids
+//! - `POST /collections/:name/points/count` (feature `exp_points_count`)
+//! - `POST /collections/:name/points/payload/set` (feature `exp_payload_mutation_api`)
+//! - `POST /collections/:name/points/payload/delete` (feature `exp_payload_mutation_api`)
 //! - `POST /collections/:name/search`: top-1 nearest/most similar point
 //! - `POST /collections/:name/search/topk`: top-k nearest/most similar points
 //! - `POST /collections/:name/search/topk/batch`: batched top-k queries
@@ -73,6 +76,8 @@ use crate::handlers::{
 use crate::handlers_metrics::{metrics, metrics_prometheus};
 #[cfg(feature = "exp_points_count")]
 use crate::handlers_points::count_points;
+#[cfg(feature = "exp_payload_mutation_api")]
+use crate::handlers_points::{delete_payload_keys, set_payload};
 use crate::handlers_points::{delete_point, get_point, list_points};
 use crate::handlers_search::{
     search_collection, search_collection_top_k, search_collection_top_k_batch,
@@ -246,6 +251,13 @@ pub(crate) fn build_app(state: AppState) -> Router {
         .layer(engine_guard_layer);
     #[cfg(feature = "exp_points_count")]
     let data_routes = data_routes.route("/collections/:name/points/count", post(count_points));
+    #[cfg(feature = "exp_payload_mutation_api")]
+    let data_routes = data_routes
+        .route("/collections/:name/points/payload/set", post(set_payload))
+        .route(
+            "/collections/:name/points/payload/delete",
+            post(delete_payload_keys),
+        );
 
     Router::new()
         .route("/live", get(live))
