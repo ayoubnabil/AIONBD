@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">AIONBD - Edge-first vector database</title>
+  <desc id="desc">Social preview image for AIONBD</desc>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f2f2ef" />
+      <stop offset="100%" stop-color="#e1e5e9" />
+    </linearGradient>
+    <style>
+      .title { font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 68px; font-weight: 700; fill: #101316; }
+      .subtitle { font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 30px; fill: #303841; }
+      .meta { font-family: 'IBM Plex Mono', monospace; font-size: 24px; fill: #4f5660; }
+      .box { fill: #ffffff; stroke: #192530; stroke-width: 3; }
+    </style>
+  </defs>
+  <rect width="1200" height="630" fill="url(#g)" />
+  <rect x="42" y="42" width="1116" height="546" fill="none" stroke="#c3c9cf" stroke-width="2" />
+
+  <text class="title" x="80" y="205">AIONBD</text>
+  <text class="subtitle" x="80" y="258">Edge-first vector database for AI retrieval</text>
+  <text class="meta" x="80" y="312">exact | ivf | auto - deterministic limits - production observability</text>
+
+  <rect class="box" x="80" y="360" width="330" height="150" />
+  <rect class="box" x="435" y="360" width="330" height="150" />
+  <rect class="box" x="790" y="360" width="330" height="150" />
+
+  <text class="subtitle" x="245" y="430" text-anchor="middle">API + Runtime</text>
+  <text class="subtitle" x="600" y="430" text-anchor="middle">Search Engine</text>
+  <text class="subtitle" x="955" y="430" text-anchor="middle">WAL + Metrics</text>
+</svg>

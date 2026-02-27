@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ayoubnabil.github.io/AIONBD/sitemap.xml

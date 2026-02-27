@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Vector AI use case: how AIONBD supports edge production retrieval with deterministic limits, explicit durability, and operational visibility."
+        />
+        <meta
+            name="keywords"
+            content="Vector AI use case, edge vector AI, vector AI production, AIONBD use case"
+        />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <title>Vector AI Use Case | Edge Production with AIONBD</title>
+
+        <link
+            rel="canonical"
+            href="https://ayoubnabil.github.io/AIONBD/blog/use-case-vector-ai.html"
+        />
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+
+        <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="AIONBD" />
+        <meta
+            property="og:title"
+            content="Vector AI Use Case | Edge Production with AIONBD"
+        />
+        <meta
+            property="og:description"
+            content="Practical Vector AI deployment pattern for constrained environments using AIONBD."
+        />
+        <meta
+            property="og:url"
+            content="https://ayoubnabil.github.io/AIONBD/blog/use-case-vector-ai.html"
+        />
+        <meta
+            property="og:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            content="Vector AI Use Case | Edge Production with AIONBD"
+        />
+        <meta
+            name="twitter:description"
+            content="A concrete Vector AI use case for edge production retrieval workloads."
+        />
+        <meta
+            name="twitter:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href="../styles.css" />
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "BlogPosting",
+                "headline": "Vector AI Use Case: Edge Production with AIONBD",
+                "description": "Practical deployment pattern for Vector AI retrieval on constrained infrastructure.",
+                "url": "https://ayoubnabil.github.io/AIONBD/blog/use-case-vector-ai.html",
+                "datePublished": "2026-02-27",
+                "dateModified": "2026-02-27",
+                "author": {
+                    "@type": "Organization",
+                    "name": "AIONBD Project"
+                },
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "AIONBD Project"
+                }
+            }
+        </script>
+    </head>
+
+    <body>
+        <a class="skip-link" href="#main-content">Skip to main content</a>
+
+        <div class="layout">
+            <header class="hero">
+                <p class="kicker">AIONBD Blog</p>
+                <h1>Vector AI Use Case: Edge Production Blueprint</h1>
+                <p class="lead">
+                    This page describes a practical Vector AI deployment model
+                    where retrieval needs to be fast, predictable, and
+                    operationally simple outside large centralized clusters.
+                </p>
+                <div class="cta-row">
+                    <a class="btn" href="../">Back to main page</a>
+                    <a class="btn" href="../docs/">Open Docs Hub</a>
+                    <a class="btn" href="./">Open Blog Hub</a>
+                    <a
+                        class="btn btn-secondary"
+                        href="vector-ai-search-edge.html"
+                        >Read Vector AI Search article</a
+                    >
+                </div>
+            </header>
+
+            <nav class="toc" aria-label="Article navigation">
+                <a href="#context">Context</a>
+                <a href="#constraints">Constraints</a>
+                <a href="#design">Design</a>
+                <a href="#ops">Ops model</a>
+                <a href="#results">Expected results</a>
+            </nav>
+
+            <main id="main-content">
+                <section class="section" id="context">
+                    <h2>Context</h2>
+                    <p>
+                        A regional edge deployment needs local Vector AI
+                        retrieval for latency-sensitive recommendations. Network
+                        connectivity to central systems is intermittent, and
+                        runtime resources are fixed.
+                    </p>
+                </section>
+
+                <section class="section" id="constraints">
+                    <h2>Constraints</h2>
+                    <ul class="plain-list">
+                        <li>
+                            Hard memory budget and limited storage throughput.
+                        </li>
+                        <li>
+                            Requirement for clear durability posture and
+                            auditable tradeoffs.
+                        </li>
+                        <li>
+                            Need for explicit API limits to prevent
+                            noisy-neighbor behavior.
+                        </li>
+                        <li>
+                            Operations team requires Prometheus-compatible
+                            metrics and runbooks.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="design">
+                    <h2>Vector AI Design with AIONBD</h2>
+                    <ul class="plain-list">
+                        <li>
+                            Use exact mode for quality-sensitive paths and
+                            IVF/auto for throughput paths.
+                        </li>
+                        <li>
+                            Use WAL sync-on-write for safety-first environments.
+                        </li>
+                        <li>
+                            Cap concurrency, request body size, and top-k to
+                            stabilize tail latency.
+                        </li>
+                        <li>
+                            Adopt batch endpoints for higher throughput Vector
+                            AI Search traffic.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="ops">
+                    <h2>Operations Model</h2>
+                    <p>
+                        Baseline SLOs are tied to readiness, 5xx ratio,
+                        checkpoint health, and IVF fallback ratio. The on-call
+                        workflow starts from metrics, then applies controlled
+                        mitigations before restarts.
+                    </p>
+                    <p class="note">
+                        Reference docs:
+                        <a
+                            href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/operations_observability.md"
+                            target="_blank"
+                            rel="noreferrer"
+                            >operations_observability.md</a
+                        >
+                    </p>
+                </section>
+
+                <section class="section" id="results">
+                    <h2>Expected Results</h2>
+                    <ul class="plain-list">
+                        <li>
+                            Predictable Vector AI response patterns under
+                            constrained load.
+                        </li>
+                        <li>
+                            Operationally explicit durability and recovery
+                            behavior.
+                        </li>
+                        <li>
+                            Improved throughput with batch search and tuned
+                            persistence settings.
+                        </li>
+                        <li>
+                            Lower debugging cost due to deterministic limits and
+                            stable metrics.
+                        </li>
+                    </ul>
+                </section>
+            </main>
+
+            <footer class="footer">
+                <p>Use case article in the AIONBD Vector AI content cluster.</p>
+            </footer>
+        </div>
+    </body>
+</html>

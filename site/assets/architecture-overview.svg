@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="340" viewBox="0 0 1080 340" role="img" aria-labelledby="title desc">
+  <title id="title">AIONBD architecture overview</title>
+  <desc id="desc">Request flow from API to engine, persistence, and metrics output</desc>
+  <defs>
+    <style>
+      .bg { fill: #f6f8fa; }
+      .box { fill: #fbfdff; stroke: #1f2c38; stroke-width: 2; }
+      .line { stroke: #1f2c38; stroke-width: 2; }
+      .txt { font-family: 'IBM Plex Sans', Arial, sans-serif; fill: #101316; font-size: 18px; }
+      .muted { font-family: 'IBM Plex Sans', Arial, sans-serif; fill: #4f5660; font-size: 15px; }
+      .notebg { fill: #edf3f9; stroke: #b8c4d1; stroke-width: 1; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1080" height="340" />
+
+  <rect class="box" x="30" y="70" width="180" height="90" />
+  <text class="txt" x="120" y="115" text-anchor="middle">Clients</text>
+  <text class="muted" x="120" y="138" text-anchor="middle">SDK / HTTP</text>
+
+  <rect class="box" x="260" y="70" width="220" height="90" />
+  <text class="txt" x="370" y="115" text-anchor="middle">HTTP API</text>
+  <text class="muted" x="370" y="138" text-anchor="middle">Auth + Limits</text>
+
+  <rect class="box" x="530" y="70" width="220" height="90" />
+  <text class="txt" x="640" y="115" text-anchor="middle">Collection Engine</text>
+  <text class="muted" x="640" y="138" text-anchor="middle">Exact / IVF / Auto</text>
+
+  <rect class="box" x="800" y="40" width="250" height="90" />
+  <text class="txt" x="925" y="85" text-anchor="middle">Persistence</text>
+  <text class="muted" x="925" y="108" text-anchor="middle">WAL + Snapshot</text>
+
+  <rect class="box" x="800" y="190" width="250" height="90" />
+  <text class="txt" x="925" y="235" text-anchor="middle">Observability</text>
+  <text class="muted" x="925" y="258" text-anchor="middle">JSON + Prometheus</text>
+
+  <line class="line" x1="210" y1="115" x2="260" y2="115" />
+  <polygon fill="#1f2c38" points="258,109 270,115 258,121" />
+
+  <line class="line" x1="480" y1="115" x2="530" y2="115" />
+  <polygon fill="#1f2c38" points="528,109 540,115 528,121" />
+
+  <line class="line" x1="750" y1="100" x2="800" y2="85" />
+  <polygon fill="#1f2c38" points="796,79 810,82 799,91" />
+
+  <line class="line" x1="750" y1="130" x2="778" y2="180" />
+  <line class="line" x1="778" y1="180" x2="800" y2="220" />
+  <polygon fill="#1f2c38" points="795,213 808,225 791,224" />
+
+  <rect class="notebg" x="30" y="292" width="1020" height="30" />
+  <text class="muted" x="540" y="311" text-anchor="middle">Deterministic resource control for edge AI retrieval workflows</text>
+</svg>

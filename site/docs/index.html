@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="AIONBD Vector AI documentation hub: architecture, Vector AI Search tuning, production sizing, security, and deployment workflows for edge environments."
+        />
+        <meta
+            name="keywords"
+            content="Vector AI documentation, Vector AI Search tuning, edge vector database docs, AIONBD docs"
+        />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <title>
+            AIONBD Docs Hub | Vector AI Documentation and Search Tuning
+        </title>
+
+        <link
+            rel="canonical"
+            href="https://ayoubnabil.github.io/AIONBD/docs/"
+        />
+        <link
+            rel="alternate"
+            hreflang="en"
+            href="https://ayoubnabil.github.io/AIONBD/docs/"
+        />
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="AIONBD" />
+        <meta
+            property="og:title"
+            content="AIONBD Docs Hub | Vector AI Documentation"
+        />
+        <meta
+            property="og:description"
+            content="Documentation hub for AIONBD Vector AI architecture, Vector AI Search, operations, and deployment."
+        />
+        <meta
+            property="og:url"
+            content="https://ayoubnabil.github.io/AIONBD/docs/"
+        />
+        <meta
+            property="og:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            content="AIONBD Docs Hub | Vector AI Documentation"
+        />
+        <meta
+            name="twitter:description"
+            content="AIONBD documentation for Vector AI and Vector AI Search in production edge setups."
+        />
+        <meta
+            name="twitter:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href="../styles.css" />
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": "AIONBD Docs Hub",
+                "url": "https://ayoubnabil.github.io/AIONBD/docs/",
+                "description": "Documentation hub for Vector AI architecture, Vector AI Search tuning, operations, and deployment.",
+                "inLanguage": "en-US"
+            }
+        </script>
+    </head>
+
+    <body>
+        <a class="skip-link" href="#main-content">Skip to main content</a>
+
+        <div class="layout">
+            <header class="hero">
+                <p class="kicker">AIONBD Docs</p>
+                <h1>Vector AI Documentation Hub</h1>
+                <p class="lead">
+                    This hub expands the AIONBD semantic coverage beyond the
+                    homepage, with dedicated content for Vector AI architecture,
+                    Vector AI Search tuning, and production operations.
+                </p>
+                <div class="cta-row" aria-label="Primary links">
+                    <a class="btn" href="../">Back to main page</a>
+                    <a class="btn" href="../blog/">Open Blog Hub</a>
+                    <a class="btn" href="../blog/use-case-vector-ai.html"
+                        >Vector AI use case article</a
+                    >
+                    <a
+                        class="btn btn-secondary"
+                        href="https://github.com/ayoubnabil/AIONBD"
+                        target="_blank"
+                        rel="noreferrer"
+                        >GitHub source</a
+                    >
+                </div>
+            </header>
+
+            <nav class="toc" aria-label="Section navigation">
+                <a href="#docs-core">Core docs</a>
+                <a href="#docs-search">Vector AI Search</a>
+                <a href="#docs-ops">Operations</a>
+                <a href="#docs-deploy">Deployment</a>
+                <a href="../blog/">Blog Hub</a>
+                <a href="../blog/use-case-vector-ai.html">Use case</a>
+                <a href="../blog/vector-ai-search-edge.html">Search article</a>
+            </nav>
+
+            <main id="main-content">
+                <section class="section" id="docs-core">
+                    <h2>Core Documentation</h2>
+                    <ul class="plain-list">
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/README.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >README.md</a
+                            >
+                            - Project overview and API baseline.
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/platform_guide.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >platform_guide.md</a
+                            >
+                            - Platform model and topology patterns.
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/architecture.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >architecture.md</a
+                            >
+                            - Module boundaries and design direction.
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/whitepaper.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >whitepaper.md</a
+                            >
+                            - Detailed technical narrative.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="docs-search">
+                    <h2>Vector AI Search Documentation</h2>
+                    <p>
+                        For Vector AI Search workloads, start with benchmark and
+                        tuning resources, then validate using your own hardware
+                        and query distributions.
+                    </p>
+                    <ul class="plain-list">
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/optimizations_and_benchmarks.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >optimizations_and_benchmarks.md</a
+                            >
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/performance_tuning.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >performance_tuning.md</a
+                            >
+                        </li>
+                        <li>
+                            <a href="../blog/vector-ai-search-edge.html"
+                                >Vector AI Search at the edge (article)</a
+                            >
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="docs-ops">
+                    <h2>Operations and Security</h2>
+                    <ul class="plain-list">
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/operations_observability.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >operations_observability.md</a
+                            >
+                            - SLOs, alerts, and runbooks.
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/security_notes.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >security_notes.md</a
+                            >
+                            - TLS, auth, quotas, and hardening.
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/production_sizing.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >production_sizing.md</a
+                            >
+                            - Capacity planning model.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="docs-deploy">
+                    <h2>Deployment Workflows</h2>
+                    <ul class="plain-list">
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/packaging_and_distribution.md"
+                                target="_blank"
+                                rel="noreferrer"
+                                >packaging_and_distribution.md</a
+                            >
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/ops/deploy/docker-compose.prod.yml"
+                                target="_blank"
+                                rel="noreferrer"
+                                >docker-compose.prod.yml</a
+                            >
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/blob/main/ops/deploy/kubernetes/aionbd.yaml"
+                                target="_blank"
+                                rel="noreferrer"
+                                >kubernetes/aionbd.yaml</a
+                            >
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ayoubnabil/AIONBD/tree/main/ops/deploy/helm/aionbd"
+                                target="_blank"
+                                rel="noreferrer"
+                                >Helm chart</a
+                            >
+                        </li>
+                    </ul>
+                </section>
+            </main>
+
+            <footer class="footer">
+                <p>Docs hub page for AIONBD Vector AI content cluster.</p>
+            </footer>
+        </div>
+    </body>
+</html>

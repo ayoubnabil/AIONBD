@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Vector AI Search at the edge: exact vs IVF strategy, batch query patterns, and tuning workflow for AIONBD in production."
+        />
+        <meta
+            name="keywords"
+            content="Vector AI Search, edge vector AI search, exact vs IVF, top-k batch search, AIONBD search"
+        />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <title>Vector AI Search at the Edge | Exact vs IVF with AIONBD</title>
+
+        <link
+            rel="canonical"
+            href="https://ayoubnabil.github.io/AIONBD/blog/vector-ai-search-edge.html"
+        />
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+
+        <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="AIONBD" />
+        <meta
+            property="og:title"
+            content="Vector AI Search at the Edge | Exact vs IVF with AIONBD"
+        />
+        <meta
+            property="og:description"
+            content="How to run Vector AI Search on constrained infrastructure with exact, IVF, and auto modes."
+        />
+        <meta
+            property="og:url"
+            content="https://ayoubnabil.github.io/AIONBD/blog/vector-ai-search-edge.html"
+        />
+        <meta
+            property="og:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            content="Vector AI Search at the Edge | Exact vs IVF with AIONBD"
+        />
+        <meta
+            name="twitter:description"
+            content="Tuning guide for Vector AI Search workloads using AIONBD exact/IVF/auto modes."
+        />
+        <meta
+            name="twitter:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href="../styles.css" />
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "TechArticle",
+                "headline": "Vector AI Search at the Edge: Exact vs IVF with AIONBD",
+                "description": "Operational and performance guidance for Vector AI Search on constrained environments.",
+                "url": "https://ayoubnabil.github.io/AIONBD/blog/vector-ai-search-edge.html",
+                "datePublished": "2026-02-27",
+                "dateModified": "2026-02-27",
+                "author": {
+                    "@type": "Organization",
+                    "name": "AIONBD Project"
+                },
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "AIONBD Project"
+                }
+            }
+        </script>
+    </head>
+
+    <body>
+        <a class="skip-link" href="#main-content">Skip to main content</a>
+
+        <div class="layout">
+            <header class="hero">
+                <p class="kicker">AIONBD Blog</p>
+                <h1>Vector AI Search at the Edge: Exact vs IVF</h1>
+                <p class="lead">
+                    This page focuses on Vector AI Search strategy selection for
+                    edge deployments, including exact, IVF, and auto mode
+                    behavior under production constraints.
+                </p>
+                <div class="cta-row">
+                    <a class="btn" href="../">Back to main page</a>
+                    <a class="btn" href="../docs/">Open Docs Hub</a>
+                    <a class="btn" href="./">Open Blog Hub</a>
+                    <a class="btn btn-secondary" href="use-case-vector-ai.html"
+                        >Read Vector AI use case</a
+                    >
+                </div>
+            </header>
+
+            <nav class="toc" aria-label="Article navigation">
+                <a href="#modes">Search modes</a>
+                <a href="#batch">Batch strategy</a>
+                <a href="#limits">Limits and guards</a>
+                <a href="#tuning">Tuning steps</a>
+            </nav>
+
+            <main id="main-content">
+                <section class="section" id="modes">
+                    <h2>Vector AI Search Modes</h2>
+                    <ul class="plain-list">
+                        <li>
+                            <strong>exact</strong>: full candidate scoring and
+                            stable quality baseline.
+                        </li>
+                        <li>
+                            <strong>ivf</strong>: candidate pruning for higher
+                            throughput with recall tradeoff.
+                        </li>
+                        <li>
+                            <strong>auto</strong>: policy-based mode selection
+                            when workload behavior changes.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="batch">
+                    <h2>Batch Query Strategy</h2>
+                    <p>
+                        For throughput-heavy Vector AI Search, use
+                        <code>/search/topk/batch</code>. Keep single-query
+                        endpoints for latency-sensitive low-volume integration
+                        paths.
+                    </p>
+                </section>
+
+                <section class="section" id="limits">
+                    <h2>Runtime Guards for Stability</h2>
+                    <ul class="plain-list">
+                        <li>
+                            Set <code>AIONBD_MAX_TOPK_LIMIT</code> to control
+                            fanout cost.
+                        </li>
+                        <li>
+                            Set <code>AIONBD_MAX_CONCURRENCY</code> based on
+                            p95/p99 behavior.
+                        </li>
+                        <li>
+                            Set <code>AIONBD_MAX_BODY_BYTES</code> to prevent
+                            request spikes.
+                        </li>
+                        <li>
+                            Track fallback and cache metrics to tune IVF
+                            behavior.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="tuning">
+                    <h2>Practical Tuning Workflow</h2>
+                    <ol class="plain-list">
+                        <li>
+                            Start with default safety-first durability profile.
+                        </li>
+                        <li>
+                            Run benchmark and soak baselines with
+                            production-like data shapes.
+                        </li>
+                        <li>
+                            Tune read path knobs, then write path knobs, then
+                            runtime limits.
+                        </li>
+                        <li>
+                            Rollback quickly if 5xx ratio or p95/p99 materially
+                            regress.
+                        </li>
+                    </ol>
+                    <p class="note">
+                        Reference:
+                        <a
+                            href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/performance_tuning.md"
+                            target="_blank"
+                            rel="noreferrer"
+                            >performance_tuning.md</a
+                        >
+                    </p>
+                </section>
+            </main>
+
+            <footer class="footer">
+                <p>
+                    Vector AI Search article in the AIONBD semantic content
+                    cluster.
+                </p>
+            </footer>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="AIONBD is a Vector AI database for edge production systems, focused on Vector AI Search, deterministic limits, explicit durability controls, and operational observability."
+        />
+        <meta
+            name="keywords"
+            content="Vector AI, Vector AI Search, vector database, edge vector database, AI retrieval, RAG infrastructure, ANN search, exact search, IVF search, Rust database"
+        />
+        <meta name="author" content="AIONBD Project" />
+        <meta
+            name="robots"
+            content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+        />
+        <meta
+            name="googlebot"
+            content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+        />
+        <meta name="theme-color" content="#1d2731" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+        <title>AIONBD | Vector AI Database for Edge Production</title>
+
+        <link rel="canonical" href="https://ayoubnabil.github.io/AIONBD/" />
+        <link
+            rel="alternate"
+            hreflang="en"
+            href="https://ayoubnabil.github.io/AIONBD/"
+        />
+        <link
+            rel="alternate"
+            hreflang="x-default"
+            href="https://ayoubnabil.github.io/AIONBD/"
+        />
+        <link rel="sitemap" type="application/xml" href="sitemap.xml" />
+        <link rel="manifest" href="site.webmanifest" />
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="AIONBD" />
+        <meta property="og:locale" content="en_US" />
+        <meta
+            property="og:title"
+            content="AIONBD | Vector AI Database for Edge Production"
+        />
+        <meta
+            property="og:description"
+            content="Vector AI database built for edge production: exact and IVF modes, Vector AI Search workflows, durability controls, and observability."
+        />
+        <meta
+            property="og:url"
+            content="https://ayoubnabil.github.io/AIONBD/"
+        />
+        <meta
+            property="og:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta
+            property="og:image:alt"
+            content="AIONBD Vector AI database overview"
+        />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            content="AIONBD | Vector AI Database for Edge Production"
+        />
+        <meta
+            name="twitter:description"
+            content="Vector AI and Vector AI Search platform for edge workloads with deterministic runtime control and production observability."
+        />
+        <meta
+            name="twitter:image"
+            content="https://ayoubnabil.github.io/AIONBD/assets/og-aionbd.png"
+        />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href="styles.css" />
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                "name": "AIONBD",
+                "url": "https://ayoubnabil.github.io/AIONBD/",
+                "description": "AIONBD is a Vector AI database for edge production systems.",
+                "inLanguage": "en-US",
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "AIONBD Project"
+                }
+            }
+        </script>
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "SoftwareApplication",
+                "name": "AIONBD",
+                "applicationCategory": "DatabaseApplication",
+                "operatingSystem": "Linux",
+                "softwareVersion": "Public Preview",
+                "url": "https://ayoubnabil.github.io/AIONBD/",
+                "downloadUrl": "https://github.com/ayoubnabil/AIONBD",
+                "description": "Vector AI database with exact, IVF, and auto modes for Vector AI Search and AI retrieval in constrained environments.",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD"
+                }
+            }
+        </script>
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "What is AIONBD in the Vector AI space?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "AIONBD is a Vector AI database designed for edge and constrained production environments where deterministic behavior and explicit operational control are required."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Does AIONBD support Vector AI Search workloads?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes. AIONBD supports Vector AI Search through exact, IVF, and auto search modes, including top-k and batch query APIs."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Can durability and throughput be tuned?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes. Safe durability is default with WAL sync-on-write, while throughput-oriented profiles can be enabled with explicit acknowledged-write-loss risk acceptance."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How can AIONBD be deployed?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "AIONBD can be deployed as a release binary, OCI image, Docker Compose stack, systemd service, Kubernetes manifest, or Helm chart."
+                        }
+                    }
+                ]
+            }
+        </script>
+    </head>
+
+    <body>
+        <a class="skip-link" href="#main-content">Skip to main content</a>
+
+        <div class="layout">
+            <header class="hero" id="top">
+                <p class="kicker">AIONBD</p>
+                <h1>Edge-First Vector AI Database for Production</h1>
+                <p class="lead">
+                    AIONBD is a Vector AI platform built to run production
+                    retrieval systems on edge nodes and constrained
+                    infrastructure.
+                </p>
+                <p class="lead">
+                    It combines deterministic runtime guardrails, explicit
+                    durability profiles, and high-throughput Vector AI Search
+                    across exact, IVF, and auto modes.
+                </p>
+
+                <div class="cta-row" aria-label="Primary links">
+                    <a class="btn" href="docs/">Open Docs Hub</a>
+                    <a class="btn" href="blog/use-case-vector-ai.html"
+                        >Read Vector AI Use Case</a
+                    >
+                    <a
+                        class="btn btn-secondary"
+                        href="https://github.com/ayoubnabil/AIONBD"
+                        target="_blank"
+                        rel="noreferrer"
+                        >Open GitHub repository</a
+                    >
+                </div>
+
+                <div class="status-grid" aria-label="Project status highlights">
+                    <div class="status">
+                        <h2>Project Stage</h2>
+                        <p>Public preview.</p>
+                    </div>
+                    <div class="status">
+                        <h2>License Status</h2>
+                        <p>
+                            Evaluation license. Production use is currently
+                            prohibited.
+                        </p>
+                    </div>
+                    <div class="status">
+                        <h2>Search Modes</h2>
+                        <p>
+                            <code>exact</code>, <code>ivf</code>,
+                            <code>auto</code>.
+                        </p>
+                    </div>
+                    <div class="status">
+                        <h2>Target Environments</h2>
+                        <p>
+                            Edge nodes, constrained machines, intermittent
+                            networks.
+                        </p>
+                    </div>
+                </div>
+
+                <figure class="diagram">
+                    <img
+                        src="assets/architecture-overview.svg"
+                        width="1080"
+                        height="340"
+                        alt="AIONBD architecture - Vector AI Edge Database flow"
+                        loading="eager"
+                        fetchpriority="high"
+                    />
+                    <figcaption>
+                        High-level architecture flow for ingestion, retrieval,
+                        persistence, and observability.
+                    </figcaption>
+                </figure>
+            </header>
+
+            <nav class="toc" aria-label="On-page and site navigation">
+                <a href="#overview">Overview</a>
+                <a href="#architecture">Architecture</a>
+                <a href="#api">API Surface</a>
+                <a href="#performance">Performance</a>
+                <a href="#operations">Operations</a>
+                <a href="#security">Security</a>
+                <a href="#deployment">Deployment</a>
+                <a href="#docs">Documentation</a>
+                <a href="#faq">FAQ</a>
+                <a href="docs/">Docs Hub</a>
+                <a href="blog/">Blog Hub</a>
+                <a href="blog/use-case-vector-ai.html">Vector AI Use Case</a>
+                <a href="blog/vector-ai-search-edge.html">Vector AI Search</a>
+            </nav>
+
+            <main id="main-content">
+                <section class="section" id="overview">
+                    <h2>Overview: Why AIONBD</h2>
+                    <p>
+                        AIONBD is a Vector AI database focused on production
+                        control. The goal is reliable Vector AI Search and AI
+                        retrieval in environments where memory, I/O, and
+                        operational windows are limited.
+                    </p>
+                    <ul class="plain-list">
+                        <li>
+                            Single Rust server runtime with local-first
+                            persistence.
+                        </li>
+                        <li>
+                            Deterministic guardrails for memory, payload size,
+                            request concurrency, and query fanout.
+                        </li>
+                        <li>
+                            Explicit durability profiles with safe defaults and
+                            auditable throughput modes.
+                        </li>
+                        <li>
+                            Metrics, runbooks, soak, and chaos workflows for
+                            reliability-driven operations.
+                        </li>
+                        <li>
+                            Deployment-ready packaging across Docker, systemd,
+                            Kubernetes, and Helm.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="architecture">
+                    <h2>System Architecture</h2>
+                    <div class="split">
+                        <div>
+                            <h3>Core Modules</h3>
+                            <ul class="plain-list">
+                                <li>
+                                    <code>core/</code>: vector math,
+                                    collections, persistence primitives.
+                                </li>
+                                <li>
+                                    <code>server/</code>: HTTP API, auth,
+                                    quotas, runtime controls.
+                                </li>
+                                <li>
+                                    <code>bench/</code>: reproducible benchmark
+                                    and regression scenarios.
+                                </li>
+                                <li>
+                                    <code>sdk/</code>: JavaScript, Python, and
+                                    Go clients.
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>Reliability Model</h3>
+                            <ul class="plain-list">
+                                <li>
+                                    <code>/live</code> and
+                                    <code>/ready</code> health endpoints.
+                                </li>
+                                <li>
+                                    WAL append and in-memory apply model with
+                                    snapshots and incremental compaction.
+                                </li>
+                                <li>
+                                    Safe default durability profile:
+                                    <code>AIONBD_WAL_SYNC_ON_WRITE=true</code>.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <pre><code>Client request
+  -> HTTP handlers (server)
+  -> Collection engine (in-memory)
+  -> WAL + snapshot/incremental persistence
+  -> Metrics endpoints (JSON + Prometheus)</code></pre>
+                </section>
+
+                <section class="section" id="api">
+                    <h2>API Surface</h2>
+                    <div class="split split-3">
+                        <div>
+                            <h3>Health and Metrics</h3>
+                            <ul class="plain-list mono">
+                                <li>GET /live</li>
+                                <li>GET /ready</li>
+                                <li>GET /metrics</li>
+                                <li>GET /metrics/prometheus</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>Collections and Points</h3>
+                            <ul class="plain-list mono">
+                                <li>POST /collections</li>
+                                <li>GET /collections</li>
+                                <li>PUT /collections/:name/points/:id</li>
+                                <li>POST /collections/:name/points</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>Vector AI Search</h3>
+                            <ul class="plain-list mono">
+                                <li>POST /collections/:name/search</li>
+                                <li>POST /collections/:name/search/topk</li>
+                                <li>
+                                    POST /collections/:name/search/topk/batch
+                                </li>
+                                <li>
+                                    Modes: exact, ivf, auto with target recall
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="performance">
+                    <h2>Performance Positioning</h2>
+                    <p>
+                        Numbers below summarize results from
+                        <code>docs/optimizations_and_benchmarks.md</code>. Treat
+                        them as reproducible local positioning. Validate on your
+                        own hardware before external claims.
+                    </p>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Internal Benchmark Scenario</th>
+                                    <th>Key Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Core dot scan (10k x d128)</td>
+                                    <td>6,945,199.54 QPS, p95 1.577 ms</td>
+                                </tr>
+                                <tr>
+                                    <td>Core l2 scan (10k x d128)</td>
+                                    <td>7,030,746.86 QPS, p95 1.660 ms</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        Collection list_points 50k (cursor vs
+                                        offset)
+                                    </td>
+                                    <td>
+                                        713,509.28 pages/s vs 11,823.63 pages/s
+                                        (60.35x)
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Search quality 20k d128</td>
+                                    <td>
+                                        recall@10 = 1.0 in exact and auto; auto
+                                        p95 0.620 ms
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        Persistence write path 4096 writes d64
+                                    </td>
+                                    <td>
+                                        sync every N: 9,189.78 QPS (5.45x vs
+                                        sync each write)
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="section" id="operations">
+                    <h2>Operations and SLO Baseline</h2>
+                    <div class="split">
+                        <div>
+                            <h3>Suggested SLO Baseline</h3>
+                            <ul class="plain-list">
+                                <li>
+                                    Availability:
+                                    <code>aionbd_ready == 1</code> at 99.9% over
+                                    30 days.
+                                </li>
+                                <li>
+                                    API error budget: 5xx ratio below 1% over 5
+                                    minutes.
+                                </li>
+                                <li>
+                                    In-flight pressure: typically below 80% of
+                                    max concurrency.
+                                </li>
+                                <li>
+                                    IVF fallback ratio target: below 25% over 10
+                                    minutes.
+                                </li>
+                                <li>
+                                    Checkpoint and WAL backlog must stay
+                                    bounded.
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>High-value Metrics</h3>
+                            <ul class="plain-list mono">
+                                <li>aionbd_http_requests_in_flight</li>
+                                <li>aionbd_persistence_wal_size_bytes</li>
+                                <li>
+                                    aionbd_persistence_checkpoint_error_total
+                                </li>
+                                <li>aionbd_l2_index_cache_hit_ratio</li>
+                                <li>aionbd_search_ivf_fallback_exact_total</li>
+                                <li>aionbd_auth_failures_total</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="security">
+                    <h2>Security and Multi-Tenancy</h2>
+                    <ul class="plain-list">
+                        <li>
+                            TLS for non-local deployments with
+                            <code>AIONBD_TLS_ENABLED=true</code> and managed
+                            certificate rotation.
+                        </li>
+                        <li>
+                            Authentication modes: <code>api_key</code>,
+                            <code>bearer_token</code>, <code>jwt</code>, and
+                            mixed policies.
+                        </li>
+                        <li>
+                            Tenant protection through quotas and rate limits.
+                        </li>
+                        <li>
+                            Request surface hardening through body, concurrency,
+                            and query limit controls.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="section" id="deployment">
+                    <h2>Deployment and Packaging</h2>
+                    <p>
+                        AIONBD ships with deployment artifacts for release
+                        binaries, OCI images, Docker Compose, systemd,
+                        Kubernetes, and Helm.
+                    </p>
+
+                    <div class="split">
+                        <div>
+                            <h3>Build release binary</h3>
+                            <pre><code>cargo build --release -p aionbd-server</code></pre>
+                        </div>
+                        <div>
+                            <h3>Compose production package</h3>
+                            <pre><code>cp ops/deploy/.env.prod.example ops/deploy/.env.prod
+
+docker compose -f ops/deploy/docker-compose.prod.yml \
+  --env-file ops/deploy/.env.prod up -d</code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="docs">
+                    <h2>Documentation Map</h2>
+                    <p>
+                        Main resources and support pages for deeper Vector AI
+                        and Vector AI Search coverage.
+                    </p>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>What it covers</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <a
+                                            href="https://github.com/ayoubnabil/AIONBD/blob/main/README.md"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            >README.md</a
+                                        >
+                                    </td>
+                                    <td>
+                                        Project scope, quick start, API
+                                        overview, configuration.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <a
+                                            href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/platform_guide.md"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            >docs/platform_guide.md</a
+                                        >
+                                    </td>
+                                    <td>
+                                        Platform scope, architecture model, and
+                                        topologies.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <a
+                                            href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/optimizations_and_benchmarks.md"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            >docs/optimizations_and_benchmarks.md</a
+                                        >
+                                    </td>
+                                    <td>
+                                        Benchmark matrix, optimization workflow,
+                                        reproducibility.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <a
+                                            href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/performance_tuning.md"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            >docs/performance_tuning.md</a
+                                        >
+                                    </td>
+                                    <td>
+                                        Runtime tuning knobs for latency,
+                                        throughput, durability.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <a
+                                            href="https://github.com/ayoubnabil/AIONBD/blob/main/docs/production_sizing.md"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            >docs/production_sizing.md</a
+                                        >
+                                    </td>
+                                    <td>
+                                        Memory, disk, and capacity planning
+                                        baselines.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="note">
+                        Internal pages: <a href="docs/">Docs Hub</a>,
+                        <a href="blog/">Blog Hub</a>,
+                        <a href="blog/use-case-vector-ai.html"
+                            >Vector AI use case</a
+                        >,
+                        <a href="blog/vector-ai-search-edge.html"
+                            >Vector AI Search at the edge</a
+                        >.
+                    </p>
+                </section>
+
+                <section class="section" id="faq">
+                    <h2>FAQ</h2>
+                    <div class="faq-item">
+                        <h3>What is AIONBD in a Vector AI context?</h3>
+                        <p>
+                            AIONBD is a Vector AI database for production
+                            retrieval systems that require deterministic limits
+                            and predictable operational behavior.
+                        </p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>Can it run Vector AI Search workloads?</h3>
+                        <p>
+                            Yes. Vector AI Search is supported through exact,
+                            IVF, and auto modes with top-k and batch APIs.
+                        </p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>
+                            How do durability and throughput tradeoffs work?
+                        </h3>
+                        <p>
+                            Safe durability is default with sync-on-write.
+                            Throughput-focused profiles can be enabled
+                            explicitly with documented acknowledged write-loss
+                            risk.
+                        </p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>Is AIONBD currently production-licensed?</h3>
+                        <p>
+                            Not yet. The codebase is production-oriented, but
+                            the current license remains evaluation-only.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="section" id="authority">
+                    <h2>Authority and Off-Page Signals</h2>
+                    <p>
+                        Ranking on competitive terms like
+                        <strong>Vector AI</strong> also depends on external
+                        authority. The technical site is optimized, but
+                        backlinks and community references are still required.
+                    </p>
+                    <ul class="plain-list">
+                        <li>
+                            Publish benchmark and architecture posts on Dev.to
+                            and Medium with links to this site.
+                        </li>
+                        <li>
+                            Share release notes and benchmark updates on Hacker
+                            News and relevant Reddit communities.
+                        </li>
+                        <li>
+                            Publish short technical posts from the GitHub
+                            repository and link back to the Docs Hub.
+                        </li>
+                        <li>
+                            Ask SDK users and integration partners to reference
+                            AIONBD in technical writeups.
+                        </li>
+                    </ul>
+                </section>
+            </main>
+
+            <footer class="footer">
+                <p>
+                    AIONBD project brief generated from repository documentation
+                    and operational guides.
+                </p>
+            </footer>
+        </div>
+    </body>
+</html>
