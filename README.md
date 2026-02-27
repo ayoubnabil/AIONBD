@@ -43,6 +43,11 @@ What is already production-oriented:
 - Finalize deployment packaging quality gates (container, systemd, Kubernetes, Helm, release bundles).
 - Finish security hardening checklist and publish the stable support policy.
 
+## Community and Support
+
+- Join the Discord community: [AIONBD Discord](https://discord.gg/v9gwAFS7Yp)
+- If this project helps you, please give it a GitHub star to support it: [github.com/ayoubnabil/AIONBD](https://github.com/ayoubnabil/AIONBD)
+
 ## Quick Start
 
 ### 1. Build and run
