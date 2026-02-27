@@ -42,6 +42,17 @@ Single-query profile (`aionbd-batch-size=1`, train `20000`, test `500`, `repeat=
 | AIONBD auto | `175.01` | `7.62` ms |
 | Qdrant exact | `115.73` | `11.85` ms |
 
+Persistence-enabled open-source profile (`d784`, `topk=10`, local run, `repeat=1`):
+
+| Scenario | AIONBD mode | AIONBD QPS / p95 / recall@10 | Qdrant exact QPS / p95 / recall@10 |
+|---|---|---:|---:|
+| train `100000`, test `300`, `aionbd-batch-size=1` | auto (effective exact), exact | auto: `53.19` / `20.94` ms / `0.9807`; exact: `46.50` / `24.09` ms / `0.9807` | `31.35` / `54.38` ms / `0.9787` |
+| train `500000`, test `100`, `aionbd-batch-size=128` | auto (effective exact) | `94.78` / `10.55` ms / `0.8710` | `6.80` / `222.41` ms / `0.8710` |
+
+Reference report artifacts:
+- `bench/reports/open_source_bench/aionbd_qdrant_100k_persist_opt_local.json`
+- `bench/reports/open_source_bench/aionbd_qdrant_500k_persist_batch128_opt_local.json`
+
 Interpretation guardrails:
 - Qdrant path in this wrapper is exact search (`params.exact=true`) and per-query HTTP.
 - AIONBD numbers include both single-query and batch-query serving profiles.
@@ -142,6 +153,34 @@ python3 scripts/run_ann_open_bench_wrapper.py \
   ... \
   --bench-cpu-affinity 0-3 \
   --aionbd-cpu-affinity 4-7
+
+python3 scripts/run_ann_open_bench_wrapper.py \
+  --dataset-path bench/data/ann/fashion-mnist-100k.hdf5 \
+  --train-size 100000 \
+  --test-size 300 \
+  --topk 10 \
+  --engines aionbd,qdrant \
+  --aionbd-modes exact,auto \
+  --aionbd-batch-size 1 \
+  --aionbd-upsert-batch-size 1024 \
+  --aionbd-persistence-enabled true \
+  --aionbd-wal-sync-on-write false \
+  --report-json bench/reports/open_source_bench/aionbd_qdrant_100k_persist_opt_local.json \
+  --report-md bench/reports/open_source_bench/aionbd_qdrant_100k_persist_opt_local.md
+
+python3 scripts/run_ann_open_bench_wrapper.py \
+  --dataset-path bench/data/ann/fashion-mnist-500k.hdf5 \
+  --train-size 500000 \
+  --test-size 100 \
+  --topk 10 \
+  --engines aionbd,qdrant \
+  --aionbd-modes auto \
+  --aionbd-batch-size 128 \
+  --aionbd-upsert-batch-size 1024 \
+  --aionbd-persistence-enabled true \
+  --aionbd-wal-sync-on-write false \
+  --report-json bench/reports/open_source_bench/aionbd_qdrant_500k_persist_batch128_opt_local.json \
+  --report-md bench/reports/open_source_bench/aionbd_qdrant_500k_persist_batch128_opt_local.md
 ```
 
 ## Optimization Tuning Variables
