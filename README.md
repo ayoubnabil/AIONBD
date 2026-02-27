@@ -273,11 +273,17 @@ Performance details, optimization notes, and reproducible benchmark commands are
 - `docs/development.md`
 - `docs/README.md` (documentation index)
 
-Recent local benchmark positioning (reproducible command and raw report):
-- AIONBD auto: ~`767 QPS`, p95 ~`1.40 ms`, recall@10 `1.0`
-- AIONBD exact: ~`683 QPS`, p95 ~`1.77 ms`, recall@10 `1.0`
-- Qdrant exact: ~`65 QPS`, p95 ~`21.03 ms`, recall@10 `1.0`
-- Command: `python3 scripts/run_ann_open_bench_wrapper.py --train-size 20000 --test-size 500 --topk 10 --engines aionbd,qdrant --aionbd-modes exact,auto --aionbd-batch-size 128`
+Recent local benchmark positioning (persistence enabled for AIONBD, reproducible commands, raw JSON reports committed under `bench/reports/open_source_bench/`):
+- `100k` (`d784`, `topk=10`, single-query serving):
+  - AIONBD auto: `53.19 QPS`, p95 `20.94 ms`, recall@10 `0.9807`
+  - AIONBD exact: `46.50 QPS`, p95 `24.09 ms`, recall@10 `0.9807`
+  - Qdrant exact: `31.35 QPS`, p95 `54.38 ms`, recall@10 `0.9787`
+- `500k` (`d784`, `topk=10`, batched serving `aionbd-batch-size=128`):
+  - AIONBD auto: `94.78 QPS`, p95 `10.55 ms`, recall@10 `0.8710`
+  - Qdrant exact: `6.80 QPS`, p95 `222.41 ms`, recall@10 `0.8710`
+- Commands:
+  - `python3 scripts/run_ann_open_bench_wrapper.py --dataset-path bench/data/ann/fashion-mnist-100k.hdf5 --train-size 100000 --test-size 300 --topk 10 --engines aionbd,qdrant --aionbd-modes exact,auto --aionbd-batch-size 1 --aionbd-upsert-batch-size 1024 --aionbd-persistence-enabled true --aionbd-wal-sync-on-write false`
+  - `python3 scripts/run_ann_open_bench_wrapper.py --dataset-path bench/data/ann/fashion-mnist-500k.hdf5 --train-size 500000 --test-size 100 --topk 10 --engines aionbd,qdrant --aionbd-modes auto --aionbd-batch-size 128 --aionbd-upsert-batch-size 1024 --aionbd-persistence-enabled true --aionbd-wal-sync-on-write false`
 
 ## Configuration Reference (Most Used)
 

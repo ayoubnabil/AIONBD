@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         default=64,
         help="number of points per AIONBD batch upsert request during ingestion (1 disables batch endpoint)",
     )
+    parser.add_argument(
+        "--aionbd-mode-ready-timeout-seconds",
+        type=float,
+        default=180.0,
+        help="max seconds to wait for AIONBD mode/index readiness before skipping the mode",
+    )
     parser.add_argument("--aionbd-bin", default="target/release/aionbd-server")
     parser.add_argument("--aionbd-port", type=int, default=18080)
     parser.add_argument(
@@ -221,12 +227,31 @@ def eval_recall(results: list[list[int]], ground_truth: np.ndarray, topk: int) -
 
 
 def start_aionbd(args: argparse.Namespace) -> tuple[subprocess.Popen[bytes], str]:
+    base_url = f"http://127.0.0.1:{args.aionbd_port}"
+    try:
+        existing = requests.get(f"{base_url}/live", timeout=0.8)
+        if existing.ok:
+            raise RuntimeError(
+                f"aionbd port {args.aionbd_port} is already in use by a live server"
+            )
+    except requests.RequestException:
+        pass
+
     env = os.environ.copy()
     env["AIONBD_BIND"] = f"127.0.0.1:{args.aionbd_port}"
     env["AIONBD_PERSISTENCE_ENABLED"] = args.aionbd_persistence_enabled
     env["AIONBD_WAL_SYNC_ON_WRITE"] = args.aionbd_wal_sync_on_write
     env["AIONBD_WAL_SYNC_EVERY_N_WRITES"] = str(args.aionbd_wal_sync_every_n_writes)
     env["AIONBD_WAL_SYNC_INTERVAL_SECONDS"] = str(args.aionbd_wal_sync_interval_seconds)
+    existing_batch_limit = 0
+    if env.get("AIONBD_UPSERT_BATCH_MAX_POINTS"):
+        try:
+            existing_batch_limit = max(int(env["AIONBD_UPSERT_BATCH_MAX_POINTS"]), 0)
+        except ValueError:
+            existing_batch_limit = 0
+    env["AIONBD_UPSERT_BATCH_MAX_POINTS"] = str(
+        max(existing_batch_limit, args.aionbd_upsert_batch_size)
+    )
     if args.aionbd_persistence_enabled == "true":
         persistence_root = Path("bench/tmp/persistence") / f"aionbd_{args.aionbd_port}"
         if persistence_root.exists():
@@ -249,7 +274,6 @@ def start_aionbd(args: argparse.Namespace) -> tuple[subprocess.Popen[bytes], str
         raise RuntimeError(
             "taskset is required for --aionbd-cpu-affinity but was not found"
         ) from error
-    base_url = f"http://127.0.0.1:{args.aionbd_port}"
     wait_http(f"{base_url}/live")
     return proc, base_url
 
@@ -282,7 +306,7 @@ def aionbd_search_topk(
             "mode": mode,
             "limit": topk,
         },
-        timeout=20,
+        timeout=120,
     )
     response.raise_for_status()
     return response.json()
@@ -304,7 +328,7 @@ def aionbd_search_topk_batch(
             "mode": mode,
             "limit": topk,
         },
-        timeout=20,
+        timeout=120,
     )
     response.raise_for_status()
     return response.json()
@@ -324,7 +348,7 @@ def aionbd_upsert_points_batch(
     response = session.post(
         f"{base_url}/collections/{collection}/points",
         json={"points": points},
-        timeout=30,
+        timeout=120,
     )
     response.raise_for_status()
     return response.json()
@@ -338,7 +362,7 @@ def ensure_aionbd_collection_reset(
 ) -> None:
     delete_response = session.delete(
         f"{base_url}/collections/{collection}",
-        timeout=20,
+        timeout=120,
     )
     if delete_response.status_code not in (200, 404):
         delete_response.raise_for_status()
@@ -350,13 +374,13 @@ def ensure_aionbd_collection_reset(
             "dimension": dimension,
             "strict_finite": True,
         },
-        timeout=20,
+        timeout=120,
     )
     if create_response.status_code == 409:
         # Retry once after best-effort delete in case of stale state.
         retry_delete = session.delete(
             f"{base_url}/collections/{collection}",
-            timeout=20,
+            timeout=120,
         )
         if retry_delete.status_code not in (200, 404):
             retry_delete.raise_for_status()
@@ -367,7 +391,7 @@ def ensure_aionbd_collection_reset(
                 "dimension": dimension,
                 "strict_finite": True,
             },
-            timeout=20,
+            timeout=120,
         )
     create_response.raise_for_status()
 
@@ -520,6 +544,7 @@ def run_aionbd_bench(
     warmup_queries: int,
     aionbd_batch_size: int,
     aionbd_upsert_batch_size: int,
+    mode_ready_timeout_seconds: float,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     with requests.Session() as session:
         ensure_aionbd_collection_reset(
@@ -534,7 +559,7 @@ def run_aionbd_bench(
                 response = session.put(
                     f"{base_url}/collections/{collection}/points/{idx}",
                     json={"values": vector.tolist()},
-                    timeout=20,
+                    timeout=120,
                 )
                 response.raise_for_status()
         else:
@@ -571,7 +596,7 @@ def run_aionbd_bench(
                     response = session.put(
                         f"{base_url}/collections/{collection}/points/{int(idx)}",
                         json={"values": vector.tolist()},
-                        timeout=20,
+                        timeout=120,
                     )
                     response.raise_for_status()
 
@@ -587,6 +612,7 @@ def run_aionbd_bench(
                     probe_query=probe_query,
                     topk=topk,
                     mode=mode,
+                    timeout_seconds=mode_ready_timeout_seconds,
                 )
                 rows.append(
                     run_aionbd_mode_bench(
@@ -800,6 +826,7 @@ def run_single_benchmark(
                 warmup_queries=args.warmup_queries,
                 aionbd_batch_size=args.aionbd_batch_size,
                 aionbd_upsert_batch_size=args.aionbd_upsert_batch_size,
+                mode_ready_timeout_seconds=args.aionbd_mode_ready_timeout_seconds,
             )
             rows.extend(aionbd_rows)
             for item in aionbd_skipped:
@@ -993,6 +1020,8 @@ def main() -> int:
         raise ValueError("aionbd-batch-size must be > 0")
     if args.aionbd_upsert_batch_size <= 0:
         raise ValueError("aionbd-upsert-batch-size must be > 0")
+    if args.aionbd_mode_ready_timeout_seconds <= 0:
+        raise ValueError("aionbd-mode-ready-timeout-seconds must be > 0")
     if args.aionbd_wal_sync_every_n_writes < 0:
         raise ValueError("aionbd-wal-sync-every-n-writes must be >= 0")
     if args.aionbd_wal_sync_interval_seconds < 0:
@@ -1046,6 +1075,14 @@ def main() -> int:
             time.sleep(args.sleep_between_runs)
 
     if not all_rows:
+        if all_skipped:
+            details = "; ".join(
+                f"{item.get('engine', 'unknown')}: {item.get('reason', 'unknown')}"
+                for item in all_skipped
+            )
+            raise RuntimeError(
+                f"no benchmark engine completed successfully ({details})"
+            )
         raise RuntimeError("no benchmark engine completed successfully")
 
     rows_aggregated = aggregate_rows(all_rows)
@@ -1071,6 +1108,9 @@ def main() -> int:
         "warmup_queries": int(args.warmup_queries),
         "aionbd_batch_size": int(args.aionbd_batch_size),
         "aionbd_upsert_batch_size": int(args.aionbd_upsert_batch_size),
+        "aionbd_mode_ready_timeout_seconds": float(
+            args.aionbd_mode_ready_timeout_seconds
+        ),
         "runs": runs,
         "skipped": skipped_summary,
         "results": rows_aggregated,
