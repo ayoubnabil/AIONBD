@@ -141,7 +141,17 @@ go test ./...
 Full Go SDK docs: `sdk/go/README.md`.
 Go SDK changelog: `sdk/go/CHANGELOG.md`.
 
-### 10. Authentication quick start (API key mode)
+### 10. Rust SDK quick start
+
+```bash
+cd sdk/rust
+cargo test
+```
+
+Full Rust SDK docs: `sdk/rust/README.md`.
+Rust SDK changelog: `sdk/rust/CHANGELOG.md`.
+
+### 11. Authentication quick start (API key mode)
 
 ```bash
 export AIONBD_AUTH_MODE=api_key
@@ -157,7 +167,7 @@ curl -sS -X GET http://127.0.0.1:8080/collections \
   -H 'x-api-key: secret-key-a'
 ```
 
-### 11. Memory budget quick start
+### 12. Memory budget quick start
 
 ```bash
 export AIONBD_MEMORY_BUDGET_MB=128
@@ -476,6 +486,8 @@ python3 scripts/collection_export_import.py import \
 - `bench/` reproducible bench scenarios and reports
 - `sdk/js/` JavaScript client SDK
 - `sdk/python/` Python client SDK
+- `sdk/go/` Go client SDK
+- `sdk/rust/` Rust client SDK
 - `docs/` operations, sizing, performance, security
 - `ops/` deployment files, dashboards, alert rules, baselines
 - `scripts/` verification, benchmark pipelines, tooling
